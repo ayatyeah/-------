@@ -1452,12 +1452,28 @@ select.input {
 
 /* ------------------------- плавающая кнопка звонка ---------------------- */
 
-.float-call {
+/* ------------------------- плавающие кнопки ----------------------------- */
+
+/* Обе кнопки живут в одной стопке: сверху «Спросить», снизу «Заказать
+   звонок». Позиционирована только стопка — сами кнопки остаются обычными
+   элементами потока. Так .btn { position: relative } (нужен для блика)
+   не может перебить фиксацию: раньше из-за этого кнопка звонка выпадала
+   из угла и растягивалась во всю ширину подвала. */
+.float-stack {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 30;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.float-call {
   box-shadow: var(--shadow-lg);
+  border-radius: var(--r-pill);
+  padding: 12px 20px;
 }
 
 /* ------------------------------ модальные окна -------------------------- */
@@ -2178,12 +2194,8 @@ select.input {
 
 /* ------------------------------ чат на сайте ---------------------------- */
 
-/* Кнопка вызова — над плавающей кнопкой звонка, не спорит с ней. */
+/* Кнопка чата — верхняя в стопке .float-stack, та и позиционирует. */
 .ai-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 88px;
-  z-index: 45;
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -2211,10 +2223,11 @@ select.input {
   padding: 12px 15px;
 }
 
+/* Панель открывается над стопкой (две кнопки ≈ 106px + отступ 24px). */
 .ai-panel {
   position: fixed;
   right: 24px;
-  bottom: 150px;
+  bottom: 140px;
   z-index: 46;
   display: flex;
   flex-direction: column;
@@ -3120,7 +3133,7 @@ select.input {
     grid-template-columns: 1fr;
   }
 
-  .float-call {
+  .float-stack {
     right: 16px;
     bottom: 16px;
   }
@@ -3279,31 +3292,26 @@ select.input {
     width: 100%;
   }
 
-  /* Плавающая кнопка — только иконка, чтобы не перекрывать контент. */
-  .float-call {
+  /* На телефоне обе кнопки — кружки с иконкой, чтобы не съедать экран. */
+  .float-stack {
     right: 14px;
     bottom: 14px;
-    width: 54px;
-    height: 54px;
-    padding: 0;
-    font-size: 21px;
-    border-radius: var(--r-pill);
+    gap: 9px;
   }
 
-  .float-call span {
-    display: none;
-  }
-
-  /* Кнопка чата — тоже иконкой, над кнопкой звонка. */
+  .float-call,
   .ai-fab {
-    right: 14px;
-    bottom: 78px;
     width: 54px;
     height: 54px;
     padding: 0;
     justify-content: center;
   }
 
+  .float-call {
+    font-size: 21px;
+  }
+
+  .float-call span,
   .ai-fab-label {
     display: none;
   }

@@ -83,19 +83,23 @@ function Shell() {
 
       {!isAdmin && <Footer />}
 
+      {/* Плавающие кнопки одной стопкой: сверху чат, снизу звонок.
+          Позиционирует их сама стопка — у кнопок position не трогаем,
+          иначе .btn { position: relative } (блик при наведении) снова
+          перебьёт фиксацию и кнопка растянется во всю ширину. */}
       {!isAdmin && (
-        <button
-          type="button"
-          className="btn btn-brass float-call"
-          onClick={openCall}
-          aria-label="Заказать звонок"
-        >
-          📞<span>Заказать звонок</span>
-        </button>
+        <div className="float-stack">
+          <AiChat />
+          <button
+            type="button"
+            className="btn btn-brass float-call"
+            onClick={openCall}
+            aria-label="Заказать звонок"
+          >
+            📞<span>Заказать звонок</span>
+          </button>
+        </div>
       )}
-
-      {/* ИИ-помощник — только на публичной части */}
-      {!isAdmin && <AiChat />}
 
       <Modals />
       <Toast />
