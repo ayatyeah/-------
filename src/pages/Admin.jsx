@@ -4,6 +4,7 @@ import { api, clearToken, formatDateShort, getToken, setToken } from '../api'
 import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
+import Icon from '../components/Icon'
 
 const TABS = [
   { id: 'summary', name: 'Сводка' },
@@ -475,10 +476,108 @@ function NewsTab({ news, reload }) {
   )
 }
 
+/* ------------------------- ИИ-анализатор лидов --------------------------- */
+
+/**
+ * Разбирает заявки и говорит, за какую браться первой.
+ * Пока Claude не подключён, сервер считает по правилам и честно об этом пишет.
+ */
+function LeadAnalyzer({ requests, byId, setById }) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+  const [aiOn, setAiOn] = useState(null)
+
+  useEffect(() => {
+    api.ai.status().then((s) => setAiOn(s.enabled)).catch(() => setAiOn(false))
+  }, [])
+
+  async function run() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await api.ai.analyzeLeads()
+      setResult(res)
+      // Раскладываем оценки по id — таблица заявок подсветит приоритет.
+      setById(Object.fromEntries(res.leads.map((l) => [l.id, l])))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="ai-panel-admin">
+      <div className="ai-panel-head">
+        <div className="ai-badge">
+          <Icon name="spark" size={16} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <h3>ИИ-анализатор лидов</h3>
+          <p>
+            {aiOn === false
+              ? 'Claude пока не подключён — оценка по правилам (тип заявки, модель, субсидия, свежесть).'
+              : 'Оценит заявки и подскажет, кому звонить первым.'}
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={run} disabled={busy || !requests.length}>
+          {busy ? 'Анализирую…' : result ? 'Пересчитать' : 'Анализировать'}
+        </button>
+      </div>
+
+      {error && <div className="form-error" style={{ marginTop: 14 }}>{error}</div>}
+
+      {result && (
+        <>
+          <div className="ai-overview">
+            <Icon name="spark" size={14} />
+            <span>{result.overview}</span>
+          </div>
+
+          <div className="ai-leads">
+            {result.leads.map((l) => {
+              const r = requests.find((x) => x.id === l.id)
+              return (
+                <div className={`ai-lead ai-lead--${prioClass(l.priority)}`} key={l.id}>
+                  <div className="ai-lead-score">{l.score}</div>
+                  <div className="ai-lead-main">
+                    <div className="ai-lead-top">
+                      <span className={`tag ${prioTag(l.priority)}`}>{l.priority}</span>
+                      <b>{r?.fio ?? l.id}</b>
+                      {r && <span className="ai-lead-meta">{r.meta}</span>}
+                    </div>
+                    <div className="ai-lead-sum">{l.summary}</div>
+                    <div className="ai-lead-act">
+                      <Icon name="bolt" size={13} />
+                      {l.action}
+                    </div>
+                  </div>
+                  {r && (
+                    <a className="ai-lead-call" href={`tel:${r.phone.replace(/\s/g, '')}`}>
+                      {r.phone}
+                    </a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+const prioClass = (p) => (p === 'Горячий' ? 'hot' : p === 'Тёплый' ? 'warm' : 'cold')
+const prioTag = (p) =>
+  p === 'Горячий' ? 'tag-brass' : p === 'Тёплый' ? 'tag-green' : 'tag-muted'
+
 /* ---------------------------- вкладка: заявки ---------------------------- */
 
 function RequestsTab({ requests, reload }) {
   const { showToast } = useSite()
+  // Оценки ИИ по id заявки — подсвечивают строки таблицы.
+  const [scored, setScored] = useState({})
 
   const setStatus = async (r, status) => {
     try {
@@ -511,6 +610,10 @@ function RequestsTab({ requests, reload }) {
         </div>
       </div>
 
+      {requests.length > 0 && (
+        <LeadAnalyzer requests={requests} byId={scored} setById={setScored} />
+      )}
+
       {requests.length === 0 ? (
         <EmptyState title="Заявок пока нет" text="Здесь появятся запросы с сайта." />
       ) : (
@@ -529,7 +632,7 @@ function RequestsTab({ requests, reload }) {
             </thead>
             <tbody>
               {requests.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={scored[r.id] ? `row-${prioClass(scored[r.id].priority)}` : ''}>
                   <td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(r.date)}</td>
                   <td>
                     <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>

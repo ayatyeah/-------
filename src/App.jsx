@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Modals from './components/Modals'
 import Toast from './components/Toast'
+import AiChat from './components/AiChat'
 import Home from './pages/Home'
 import About from './pages/About'
 import Catalog from './pages/Catalog'
@@ -92,6 +93,9 @@ function Shell() {
           📞<span>Заказать звонок</span>
         </button>
       )}
+
+      {/* ИИ-помощник — только на публичной части */}
+      {!isAdmin && <AiChat />}
 
       <Modals />
       <Toast />

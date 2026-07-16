@@ -47,6 +47,14 @@ export const api = {
 
   createRequest: (body) => request('/requests', { method: 'POST', body }),
 
+  // --- ИИ ---
+  ai: {
+    /** Подключён ли Claude или пока работают правила. */
+    status: () => request('/ai/status'),
+    chat: (message, history) => request('/ai/chat', { method: 'POST', body: { message, history } }),
+    analyzeLeads: () => request('/ai/analyze-leads', { method: 'POST', auth: true }),
+  },
+
   // --- админка ---
   admin: {
     summary: () => request('/admin/summary', { auth: true }),
