@@ -956,6 +956,16 @@ h4 {
   align-items: start;
 }
 
+/* Элементы сетки по умолчанию не сжимаются меньше своего содержимого
+   (min-width: auto). Из-за этого лента категорий раздувала колонку
+   до 626px на экране 375px, и карточки обрезались справа. */
+.catalog-layout > *,
+.about-grid > *,
+.model-layout > *,
+.contacts-layout > * {
+  min-width: 0;
+}
+
 .filters {
   border-radius: var(--r-md);
   position: sticky;
@@ -1468,6 +1478,15 @@ select.input {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+
+/* Пока листают вниз — стопка уезжает за край, чтобы не закрывать текст.
+   Возвращается, как только человек остановился или пошёл вверх. */
+.float-stack.is-hidden {
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .float-call {
@@ -2186,6 +2205,143 @@ select.input {
   font-size: 14px;
   color: var(--brass-300);
   letter-spacing: 0.06em;
+}
+
+/* ==========================================================================
+   ЧТО МЫ ДЕЛАЕМ
+   ========================================================================== */
+
+.wwd-title {
+  font-size: clamp(28px, 3.6vw, 42px);
+  margin-top: 12px;
+  max-width: 20ch;
+}
+
+.wwd-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+  margin-top: 34px;
+}
+
+/* У элементов сетки min-width: auto — они не сжимаются меньше своего
+   содержимого, и длинное слово («Почвообрабатывающая») раздувает колонку
+   шире экрана. min-width: 0 разрешает сжатие и перенос. */
+.wwd-grid > *,
+.wwd-step > * {
+  min-width: 0;
+}
+
+/* --------------------------------- цикл --------------------------------- */
+
+.wwd-cycle {
+  display: flex;
+  flex-direction: column;
+}
+
+.wwd-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wwd-step:first-child {
+  padding-top: 0;
+}
+
+.wwd-step:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.wwd-step-ico {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--green-100);
+  color: var(--green-600);
+}
+
+.wwd-step h3 {
+  font-size: 20px;
+  margin-bottom: 3px;
+}
+
+.wwd-step p {
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+/* ------------------------------ что выпускаем --------------------------- */
+
+.wwd-make {
+  padding: 22px;
+  background: var(--green-800);
+  border-radius: var(--r-md);
+  color: var(--on-dark);
+}
+
+.wwd-make-head {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass-300);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule-dark);
+}
+
+.wwd-cats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.wwd-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 15px 13px;
+  border: 1px solid var(--rule-dark);
+  border-radius: var(--r-sm);
+  color: var(--on-dark);
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.wwd-cat:hover {
+  background: rgba(238, 243, 232, 0.06);
+  border-color: var(--brass-300);
+}
+
+.wwd-cat .icon {
+  color: var(--brass-300);
+  margin-bottom: 4px;
+}
+
+.wwd-cat-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.wwd-cat-count {
+  font-size: 13.5px;
+  color: var(--on-dark-2);
+}
+
+.wwd-cta {
+  margin-top: 4px;
 }
 
 /* ==========================================================================
@@ -2974,7 +3130,8 @@ select.input {
 
   .about-grid,
   .model-layout,
-  .contacts-layout {
+  .contacts-layout,
+  .wwd-grid {
     grid-template-columns: 1fr;
     gap: 28px;
   }
@@ -3103,12 +3260,85 @@ select.input {
 
   .grid-3,
   .grid-2,
-  .cert-grid,
-  .prod-grid,
   .svc-grid,
   .steps,
   .footer-inner {
     grid-template-columns: 1fr;
+  }
+
+  /* Цеха пока без фотографий — три большие заглушки съедали целый экран,
+     на котором нечего смотреть. На телефоне показываем их лентой. */
+  .prod-grid {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+
+  .prod-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .prod-cell {
+    flex: none;
+    width: 210px;
+    aspect-ratio: 3 / 2;
+  }
+
+  /* Сертификаты — в два столбца: карточка это заголовок и подпись. */
+  .cert-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .cert {
+    min-height: 0;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .cert-title {
+    font-size: 16px;
+  }
+
+  .cert-seal {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+  }
+
+  /* «Что выпускаем» в один столбец: в две колонки длинные названия
+     категорий («Почвообрабатывающая») не помещались и обрезались. */
+  .wwd-cats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .wwd-cat {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .wwd-cat .icon {
+    margin-bottom: 0;
+    flex: none;
+  }
+
+  .wwd-cat-name {
+    flex: 1;
+    font-size: 16px;
+  }
+
+  .wwd-cat-count {
+    white-space: nowrap;
+  }
+
+  .wwd-title {
+    max-width: none;
   }
 
   .pullquote {
@@ -3213,13 +3443,35 @@ select.input {
     display: none;
   }
 
+  /* Мелкий текст на телефоне читается тяжело — поднимаем до 14+. */
   .ticker-item {
-    font-size: 13.5px;
+    font-size: 14.5px;
     gap: 14px;
   }
 
+  .kicker {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+  }
+
+  .card-meta,
+  .cert-org,
+  .wwd-cat-count {
+    font-size: 14px;
+  }
+
+  .svc-note {
+    font-size: 13.5px;
+  }
+
+  /* «Субсидируется» и подписи колонок — важные метки, не мельчим. */
+  .tag,
+  .footer-col-title {
+    font-size: 13px;
+  }
+
   .section {
-    padding-block: 44px;
+    padding-block: 40px;
   }
 
   .section-head {
@@ -3239,9 +3491,59 @@ select.input {
     font-size: 16px;
   }
 
-  .svc,
+  /* Услуги занимали 2.5 экрана из 13 — делаем их компактнее:
+     иконка уходит в строку с заголовком, отступы меньше. */
+  .svc {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'ico title' 'text text' 'note note';
+    align-items: center;
+    gap: 4px 12px;
+    padding: 16px;
+  }
+
+  .svc-ico {
+    grid-area: ico;
+    width: 38px;
+    height: 38px;
+  }
+
+  .svc h3 {
+    grid-area: title;
+    font-size: 20px;
+  }
+
+  .svc p {
+    grid-area: text;
+    margin-top: 6px;
+  }
+
+  .svc-note {
+    grid-area: note;
+    padding-top: 10px;
+    margin-top: 4px;
+  }
+
+  .svc-grid {
+    gap: 12px;
+  }
+
   .step {
-    padding: 20px 18px;
+    padding: 16px 18px;
+  }
+
+  .steps {
+    gap: 10px;
+  }
+
+  /* Новости: обложки ниже, карточки плотнее — было 2 экрана. */
+  .card-media {
+    aspect-ratio: 16 / 9;
+  }
+
+  .grid-3,
+  .grid-2 {
+    gap: 14px;
   }
 
   .banner,
@@ -3292,23 +3594,20 @@ select.input {
     width: 100%;
   }
 
-  /* На телефоне обе кнопки — кружки с иконкой, чтобы не съедать экран. */
+  /* На телефоне обе кнопки — кружки: сверху чат, снизу звонок.
+     Текст они не закрывают: стопка уезжает, пока листают вниз. */
   .float-stack {
-    right: 14px;
-    bottom: 14px;
+    right: 12px;
+    bottom: 12px;
     gap: 9px;
   }
 
   .float-call,
   .ai-fab {
-    width: 54px;
-    height: 54px;
+    width: 50px;
+    height: 50px;
     padding: 0;
     justify-content: center;
-  }
-
-  .float-call {
-    font-size: 21px;
   }
 
   .float-call span,

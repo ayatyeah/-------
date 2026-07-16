@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { SiteProvider, useSite } from './store'
+import { useHiddenOnScrollDown } from './hooks/useMotion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Modals from './components/Modals'
 import Toast from './components/Toast'
 import AiChat from './components/AiChat'
+import Icon from './components/Icon'
 import Home from './pages/Home'
 import About from './pages/About'
 import Catalog from './pages/Catalog'
@@ -50,6 +52,8 @@ function Shell() {
   const { pathname } = useLocation()
   const { openCall } = useSite()
   const isAdmin = pathname.startsWith('/admin')
+  // Пока листают вниз — прячем стопку, чтобы не закрывала текст.
+  const stackHidden = useHiddenOnScrollDown()
 
   return (
     <div className="app">
@@ -88,7 +92,7 @@ function Shell() {
           иначе .btn { position: relative } (блик при наведении) снова
           перебьёт фиксацию и кнопка растянется во всю ширину. */}
       {!isAdmin && (
-        <div className="float-stack">
+        <div className={`float-stack${stackHidden ? ' is-hidden' : ''}`}>
           <AiChat />
           <button
             type="button"
@@ -96,7 +100,8 @@ function Shell() {
             onClick={openCall}
             aria-label="Заказать звонок"
           >
-            📞<span>Заказать звонок</span>
+            <Icon name="phone" size={18} />
+            <span>Заказать звонок</span>
           </button>
         </div>
       )}

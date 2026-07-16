@@ -51,6 +51,48 @@ export function useTilt(strength = 10) {
   return ref
 }
 
+/**
+ * true, пока пользователь листает вниз. Нужен, чтобы плавающая кнопка
+ * пряталась и не закрывала текст, а возвращалась, как только человек
+ * остановился или пошёл вверх.
+ */
+export function useHiddenOnScrollDown({ after = 200, idle = 500 } = {}) {
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    let last = window.scrollY
+    let raf = 0
+    let idleTimer = 0
+
+    const check = () => {
+      const y = window.scrollY
+      const goingDown = y > last + 4
+      const goingUp = y < last - 4
+      if (goingDown && y > after) setHidden(true)
+      else if (goingUp) setHidden(false)
+      last = y
+      raf = 0
+
+      // Остановился — показываем снова.
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => setHidden(false), idle)
+    }
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(idleTimer)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [after, idle])
+
+  return hidden
+}
+
 /** true, когда страница прокручена ниже порога — для «сжатия» шапки. */
 export function useScrolled(threshold = 12) {
   const [scrolled, setScrolled] = useState(false)

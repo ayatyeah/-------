@@ -10,6 +10,9 @@ import Ticker from '../components/Ticker'
 import Services from '../components/Services'
 import Steps from '../components/Steps'
 import Icon from '../components/Icon'
+import WhatWeDo from '../components/WhatWeDo'
+import { api } from '../api'
+import { useFetch } from '../store'
 
 const PRODUCTION = ['Сборочный цех', 'Линия покраски', 'Испытательный полигон']
 
@@ -67,6 +70,10 @@ export default function Home() {
   const stats = home?.stats ?? []
   const certs = home?.certs ?? []
   const news = home?.news ?? []
+
+  // Каталог для блока «что выпускаем» — числа моделей берём из него.
+  const models = useFetch(() => api.models(), [])
+  const cats = useFetch(() => api.categories(), [])
 
   return (
     <main className="route-fade">
@@ -152,6 +159,9 @@ export default function Home() {
 
       {/* бегущая строка регионов — CSS keyframes */}
       <Ticker />
+
+      {/* Первый содержательный экран: чем занимаемся и что выпускаем */}
+      <WhatWeDo models={models.data ?? []} categories={cats.data ?? []} />
 
       {/* ----------------------------- о компании --------------------------- */}
       <section className="section" id="about">

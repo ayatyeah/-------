@@ -1,4 +1,5 @@
 import { useSite } from '../store'
+import Icon from './Icon'
 
 export default function Toast() {
   const { toast } = useSite()
@@ -6,7 +7,7 @@ export default function Toast() {
 
   return (
     <div className="toast" role="status" aria-live="polite">
-      <span className="toast-check">✓</span>
+      <Icon name="check" size={17} className="toast-check" />
       {toast}
     </div>
   )

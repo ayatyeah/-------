@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useSite } from '../store'
+import Icon from './Icon'
 
 export default function Footer() {
   const { settings, openCall } = useSite()
@@ -45,9 +46,15 @@ export default function Footer() {
             Заказать звонок
           </button>
           <div className="footer-social">
-            <a href="#" aria-label="Instagram">IG</a>
-            <a href="#" aria-label="Telegram">TG</a>
-            <a href="#" aria-label="WhatsApp">WA</a>
+            <a href="#" aria-label="Instagram">
+              <Icon name="instagram" size={19} />
+            </a>
+            <a href="#" aria-label="Telegram">
+              <Icon name="telegram" size={19} />
+            </a>
+            <a href="#" aria-label="WhatsApp">
+              <Icon name="whatsapp" size={19} />
+            </a>
           </div>
         </div>
       </div>
