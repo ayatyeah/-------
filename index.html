@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="apple-touch-icon" href="/assets/logo.png" />
+
+    <title>ТОО «СХМ Агро» — сельхозтехника, сделанная для степи</title>
+    <meta
+      name="description"
+      content="Производство, продажа и сервис сельхозтехники в Казахстане: тракторы, комбайны, посевные комплексы. Гарантия 2 года, 34 сервисных центра, лизинг и субсидии."
+    />
+    <meta name="theme-color" content="#14301a" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Соцсети: как ссылка выглядит в WhatsApp, Telegram и поиске -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:site_name" content="ТОО «СХМ Агро»" />
+    <meta
+      property="og:title"
+      content="ТОО «СХМ Агро» — сельхозтехника, сделанная для степи"
+    />
+    <meta
+      property="og:description"
+      content="Тракторы, комбайны и посевные комплексы собственной сборки. Гарантия 2 года, запчасти на складе, сервис рядом с вашим полем."
+    />
+    <meta property="og:image" content="/assets/hero-field.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Шрифты свои: ни одного запроса на сторонний домен.
+         Предзагружаем кириллицу — ею набран весь первый экран. -->
+    <link
+      rel="preload"
+      href="/fonts/oswald-cyrillic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/ptsans-400-cyrillic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <!-- LCP-картинка героя: браузер начинает качать её, не дожидаясь JS. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/assets/hero-field.webp"
+      imagesrcset="/assets/hero-field-sm.webp 760w, /assets/hero-field.webp 1200w"
+      imagesizes="(max-width: 1000px) 100vw, 560px"
+      fetchpriority="high"
+    />
+
+    <!-- Карточка организации для поиска -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "ТОО «СХМ Агро»",
+        "description": "Производство, продажа и сервис сельскохозяйственной техники в Казахстане.",
+        "logo": "/assets/logo.png",
+        "telephone": "+7 7172 55-00-00",
+        "email": "info@shmagro.kz",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Индустриальная зона, ул. Заводская 7",
+          "addressLocality": "Астана",
+          "addressCountry": "KZ"
+        },
+        "openingHours": ["Mo-Fr 08:00-18:00", "Sa 09:00-14:00"]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

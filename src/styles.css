@@ -1,0 +1,2911 @@
+/* ==========================================================================
+   СХМ Агро — дизайн-система.
+   Строгая индустриальная сетка: тёмная зелень, бумажный фон, латунный акцент.
+   Прямые углы, тонкие линии, узкий гротеск в заголовках.
+   ========================================================================== */
+
+:root {
+  /* Основа */
+  --ink: #14251a;
+  --ink-2: #2c3f31;
+  --paper: #f4f2ec;
+  --paper-2: #eceade;
+  --surface: #ffffff;
+
+  /* Бренд */
+  --green-900: #0e2013;
+  --green-800: #14301a;
+  --green-700: #1d4526;
+  --green-600: #2c5c17;
+  --green-500: #3f7a2c;
+  --green-400: #6aa84f;
+  --green-300: #93c95f;
+  --green-100: #e8f1dd;
+
+  /* Латунь — акцент действия */
+  --brass-600: #a9761c;
+  --brass-500: #c9932c;
+  --brass-400: #e0b04a;
+  --brass-300: #ffd65c;
+  --brass-100: #fbf1d8;
+
+  /* Текст.
+     --text-3 раньше был #7d8981 — контраст 3.0–3.6 при норме WCAG AA 4.5.
+     Им набраны подписи в админке, шапки таблиц и метки: читались тяжело.
+     #5c6660 даёт 5.3 на бумажном фоне и 4.9 на плашках, оставаясь
+     заметно тише основного текста. */
+  --text: #14251a;
+  --text-2: #4c5a51;
+  --text-3: #5c6660;
+  --on-dark: #eef3e8;
+  --on-dark-2: #a9bcaa;
+
+  /* Линии */
+  --rule: #d3d0c4;
+  --rule-strong: #b4b1a3;
+  --rule-dark: rgba(238, 243, 232, 0.18);
+
+  /* Метрика */
+  --wrap: 1180px;
+  --gutter: 32px;
+  --nav-h: 80px;
+
+  /* Скругления — чуть мягче углы, но форма остаётся строгой.
+     Не «таблетки»: максимум 10px на крупных блоках. */
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-pill: 999px;
+
+  /* Oswald + PT Sans: обе с кириллицей (у Barlow её нет вовсе).
+     Oswald — узкий гротеск, родной шрифт знака СХМ Агро. */
+  --font-head: 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --font-body: 'PT Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(20, 37, 26, 0.08);
+  --shadow-md: 0 6px 20px rgba(20, 37, 26, 0.1);
+  --shadow-lg: 0 18px 48px rgba(20, 37, 26, 0.18);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* ------------------------------- сброс ---------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  /* Атрибуты width/height в разметке нужны против скачков вёрстки, но
+     браузер применяет их как CSS-подсказку. Без height:auto картинка
+     получает жёсткую высоту в пикселях и aspect-ratio перестаёт работать. */
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+::selection {
+  background: var(--brass-300);
+  color: var(--green-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass-500);
+  outline-offset: 2px;
+}
+
+/* ------------------------------ раскладка ------------------------------- */
+
+.wrap {
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app > main {
+  flex: 1;
+}
+
+.section {
+  padding-block: 72px;
+}
+
+.section--tight {
+  padding-block: 48px;
+}
+
+.section + .section {
+  border-top: 1px solid var(--rule);
+}
+
+/* Надзаголовок раздела — узкий, разрядка, латунная метка слева. */
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--green-600);
+}
+
+.kicker::before {
+  content: '';
+  width: 22px;
+  height: 2px;
+  background: var(--brass-500);
+}
+
+.kicker--light {
+  color: var(--brass-300);
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.section-head h2 {
+  font-size: clamp(30px, 3.8vw, 46px);
+  margin-top: 12px;
+}
+
+.lead {
+  font-size: 19px;
+  color: var(--text-2);
+  max-width: 62ch;
+}
+
+/* ------------------------------- кнопки --------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 12px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease),
+    border-color 0.18s var(--ease), transform 0.18s var(--ease);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--green-600);
+  color: var(--on-dark);
+  border-color: var(--green-600);
+}
+
+.btn-primary:hover {
+  background: var(--green-700);
+  border-color: var(--green-700);
+}
+
+.btn-brass {
+  background: var(--brass-300);
+  color: var(--green-900);
+  border-color: var(--brass-300);
+}
+
+.btn-brass:hover {
+  background: var(--brass-400);
+  border-color: var(--brass-400);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--rule-strong);
+}
+
+.btn-secondary:hover {
+  border-color: var(--green-600);
+  color: var(--green-600);
+}
+
+.btn-secondary--light {
+  color: var(--on-dark);
+  border-color: var(--rule-dark);
+}
+
+.btn-secondary--light:hover {
+  border-color: var(--brass-300);
+  color: var(--brass-300);
+}
+
+.btn-ghost {
+  padding: 6px 4px;
+  color: var(--green-600);
+  border-color: transparent;
+}
+
+.btn-ghost:hover {
+  color: var(--brass-600);
+}
+
+.btn-sm {
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
+.btn-lg {
+  font-size: 18px;
+  padding: 15px 30px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ------------------------------- метки ---------------------------------- */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: var(--r-xs);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.tag-brass {
+  background: var(--brass-300);
+  color: var(--green-900);
+}
+
+.tag-green {
+  background: var(--green-100);
+  color: var(--green-700);
+  border-color: var(--green-300);
+}
+
+.tag-outline {
+  border-color: var(--rule-strong);
+  color: var(--text-2);
+}
+
+/* Статусы «В работе» / «Обработана»: на светлой плашке серый текст давал
+   контраст 3.0 — рамка и более тёмный текст поднимают его выше нормы. */
+.tag-muted {
+  background: var(--paper-2);
+  color: var(--text-2);
+  border-color: var(--rule-strong);
+}
+
+/* ---------------------- рамка с угловыми засечками ---------------------- */
+
+.frame {
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.frame::before,
+.frame::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--brass-500);
+  pointer-events: none;
+}
+
+.frame::before {
+  top: -1px;
+  left: -1px;
+  border-top-left-radius: var(--r-md);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.frame::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-right-radius: var(--r-md);
+  border-left: 0;
+  border-top: 0;
+}
+
+/* --------------------------------- шапка -------------------------------- */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(244, 242, 236, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  height: var(--nav-h);
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 23px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-right: auto;
+}
+
+/* Логотип — плотный знак с текстом «СХМ АГРО / сельхозтехника».
+   Мельче ~44px он превращается в нечитаемое пятно.
+   Фон у файла непрозрачный белый, поэтому подаём его плашкой. */
+.brand img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: #fff;
+  border: 1px solid var(--rule);
+  flex: none;
+}
+
+.navlink {
+  position: relative;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding-block: 6px;
+  white-space: nowrap;
+  transition: color 0.18s var(--ease);
+}
+
+.navlink:hover {
+  color: var(--text);
+}
+
+.navlink.active {
+  color: var(--green-600);
+}
+
+.navlink.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--brass-500);
+}
+
+.nav-phone {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.nav-admin {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+}
+
+/* Кнопка звонка для планшета и телефона — появляется вместе с бургером,
+   чтобы позвонить можно было в один тап. */
+.nav-phone-sm {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--green-600);
+  color: var(--on-dark);
+  transition: background 0.18s var(--ease);
+}
+
+.nav-phone-sm:hover {
+  background: var(--green-700);
+}
+
+.nav-burger {
+  border-radius: var(--r-sm);
+  display: none;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--rule-strong);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+
+.nav-burger span {
+  display: block;
+  width: 17px;
+  height: 1.5px;
+  background: var(--text);
+}
+
+.nav-mobile {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px var(--gutter) 20px;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.nav-mobile.open {
+  display: flex;
+}
+
+.nav-mobile .navlink {
+  padding-block: 10px;
+  font-size: 17px;
+}
+
+/* --------------------------------- герой -------------------------------- */
+
+.hero {
+  position: relative;
+  background: var(--green-800);
+  color: var(--on-dark);
+  overflow: hidden;
+}
+
+/* Диагональная штриховка — «поле в борозду», едва заметная. */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    -60deg,
+    rgba(147, 201, 95, 0.07) 0 1px,
+    transparent 1px 22px
+  );
+  pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr);
+  gap: 60px;
+  align-items: center;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding: 72px var(--gutter);
+}
+
+.hero h1 {
+  /* 4.4vw, а не 5.6: «СЕЛЬХОЗТЕХНИКА» — длинное слово,
+     на 68px оно вылезало за свою колонку. */
+  font-size: clamp(40px, 5vw, 66px);
+  margin: 16px 0 20px;
+  /* Страховка: сверхдлинное слово переносится, а не рвёт сетку. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Второе слово заголовка — латунью, чтобы фраза читалась как акцент. */
+.hero h1 em {
+  font-style: normal;
+  color: var(--brass-300);
+}
+
+.hero p {
+  font-size: 20px;
+  line-height: 1.5;
+  max-width: 46ch;
+  color: var(--on-dark-2);
+  margin-bottom: 32px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.hero-figure {
+  border-radius: var(--r-lg);
+  position: relative;
+  border: 1px solid var(--rule-dark);
+}
+
+/* 4/3 вместо 16/11: снимок добирает высоту текстовой колонки,
+   иначе справа от героя остаётся пустое место.
+   overflow:hidden здесь не ставим — обрезал бы угловые засечки. */
+.hero-figure img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Угловые засечки на тёмном — латунь. */
+.hero-figure i {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--brass-300);
+}
+
+.hero-figure i.tl {
+  top: -1px;
+  left: -1px;
+  border-top-left-radius: var(--r-lg);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.hero-figure i.tr {
+  top: -1px;
+  right: -1px;
+  border-top-right-radius: var(--r-lg);
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.hero-figure i.bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-left-radius: var(--r-lg);
+  border-right: 0;
+  border-top: 0;
+}
+
+.hero-figure i.br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-right-radius: var(--r-lg);
+  border-left: 0;
+  border-top: 0;
+}
+
+/* Полоса показателей под героем. */
+.stat-strip {
+  position: relative;
+  border-top: 1px solid var(--rule-dark);
+  background: var(--green-900);
+}
+
+.stat-strip-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.stat {
+  padding: 26px 20px;
+  border-left: 1px solid var(--rule-dark);
+}
+
+.stat:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.stat-v {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--brass-300);
+}
+
+.stat-k {
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--on-dark-2);
+  margin-top: 6px;
+}
+
+/* -------------------------------- карточки ------------------------------ */
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.card {
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+
+.card--link {
+  cursor: pointer;
+}
+
+.card--link:hover {
+  border-color: var(--green-400);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.card-media {
+  border-radius: calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0 0;
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--green-800);
+  overflow: hidden;
+}
+
+.card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s var(--ease);
+}
+
+.card--link:hover .card-media img {
+  transform: scale(1.04);
+}
+
+/* Плашка вместо фото — штриховка + подпись. */
+.media-stub {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(147, 201, 95, 0.1) 0 1px,
+    transparent 1px 12px
+  );
+}
+
+.media-stub span {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-dark-2);
+  text-align: center;
+  padding: 0 12px;
+}
+
+.card-media .tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 10px;
+  padding: 22px;
+}
+
+.card-kicker {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green-600);
+}
+
+.card-meta {
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+.card-title {
+  font-size: 24px;
+}
+
+.card-text {
+  font-size: 16px;
+  color: var(--text-2);
+  flex: 1;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* -------------------------------- о компании ---------------------------- */
+
+.about-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 48px;
+  margin-top: 14px;
+}
+
+.about-grid h2 {
+  font-size: clamp(30px, 3.6vw, 42px);
+}
+
+.about-grid p + p {
+  margin-top: 14px;
+}
+
+.about-text {
+  font-size: 17px;
+  color: var(--text-2);
+  line-height: 1.68;
+}
+
+/* -------------------------------- сертификаты --------------------------- */
+
+.cert-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.cert {
+  border-radius: var(--r-md);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 148px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+
+.cert:hover {
+  border-color: var(--brass-500);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cert-seal {
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid var(--brass-500);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--brass-600);
+}
+
+.cert-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.cert-org {
+  font-size: 14px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+/* -------------------------------- баннеры ------------------------------- */
+
+.banner {
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.banner h3 {
+  font-size: 28px;
+}
+
+.banner p {
+  color: var(--text-2);
+  font-size: 16px;
+}
+
+.banner .btn {
+  margin-top: 8px;
+}
+
+/* ------------------------------- производство --------------------------- */
+
+.prod-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.prod-cell {
+  border-radius: var(--r-md);
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--green-800);
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* -------------------------------- каталог ------------------------------- */
+
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+}
+
+.filters {
+  border-radius: var(--r-md);
+  position: sticky;
+  top: calc(var(--nav-h) + 20px);
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.filters-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.filter {
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  text-align: left;
+  border: 1px solid transparent;
+  color: var(--text-2);
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.filter:hover {
+  background: var(--paper-2);
+  color: var(--text);
+}
+
+.filter.active {
+  background: var(--green-600);
+  border-color: var(--green-600);
+  color: var(--on-dark);
+}
+
+.filter-count {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.catalog-count {
+  font-size: 14px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ------------------------------ карточка модели ------------------------- */
+
+.model-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+
+.model-hero {
+  border-radius: var(--r-md);
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--green-800);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.model-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.model-thumbs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.model-thumb {
+  border-radius: var(--r-sm);
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--green-800);
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.model-thumb span {
+  font-family: var(--font-head);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-dark-2);
+}
+
+.model-title {
+  font-size: clamp(32px, 3.8vw, 46px);
+  margin: 10px 0 16px;
+}
+
+.subsidy-note {
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--brass-100);
+  border: 1px solid var(--brass-400);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.subsidy-note a {
+  color: var(--brass-600);
+  font-weight: 600;
+  border-bottom: 1px solid currentColor;
+}
+
+.model-desc {
+  color: var(--text-2);
+  line-height: 1.65;
+  margin-bottom: 24px;
+}
+
+.model-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
+}
+
+.specs-title {
+  font-size: 22px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 4px;
+}
+
+/* -------------------------------- таблицы ------------------------------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.table th {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  text-align: left;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--paper-2);
+}
+
+/* Таблица характеристик: ключ слева приглушён, значение справа акцентно. */
+.specs td:first-child {
+  color: var(--text-2);
+  width: 55%;
+}
+
+.specs td:last-child {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 16px;
+  text-align: right;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* -------------------------------- новости ------------------------------- */
+
+.article-head {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.article-title {
+  font-size: clamp(34px, 4.4vw, 52px);
+  margin: 12px 0 20px;
+}
+
+.article-cover {
+  border-radius: var(--r-lg);
+  position: relative;
+  aspect-ratio: 16 / 8;
+  background: var(--green-800);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+  margin-block: 32px;
+}
+
+.article-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.article-body {
+  max-width: 680px;
+  margin-inline: auto;
+  font-size: 18.5px;
+  line-height: 1.72;
+  color: var(--text-2);
+}
+
+/* Первый абзац — вводка, крупнее и темнее. */
+.article-body p:first-child {
+  font-size: 19px;
+  color: var(--text);
+}
+
+.article-body p + p {
+  margin-top: 20px;
+}
+
+/* -------------------------------- контакты ------------------------------ */
+
+.contacts-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  align-items: start;
+}
+
+.contact-rows {
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.contact-row {
+  padding-block: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.contact-row:first-child {
+  padding-top: 0;
+}
+
+.contact-row-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+
+.contact-row-v {
+  font-size: 17px;
+}
+
+.contact-row-v a:hover {
+  color: var(--green-600);
+}
+
+.map-stub {
+  border-radius: var(--r-md);
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin-top: 20px;
+  background: var(--green-800);
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* --------------------------------- формы -------------------------------- */
+
+.form-panel {
+  border-radius: var(--r-md);
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 11px 13px;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  font-size: 16px;
+  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--green-600);
+  background: var(--surface);
+}
+
+textarea.input {
+  min-height: 96px;
+  resize: vertical;
+}
+
+select.input {
+  cursor: pointer;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 15px;
+  user-select: none;
+}
+
+.check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--green-600);
+  cursor: pointer;
+}
+
+.form-error {
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: #fdeaea;
+  border: 1px solid #e6a5a5;
+  color: #8f2b2b;
+  font-size: 14px;
+}
+
+/* --------------------------------- подвал ------------------------------- */
+
+.footer {
+  background: var(--green-900);
+  color: var(--on-dark);
+  margin-top: 72px;
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1.1fr;
+  gap: 40px;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding: 56px var(--gutter);
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.footer-brand img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: #fff;
+  flex: none;
+}
+
+.footer p {
+  font-size: 15px;
+  color: var(--on-dark-2);
+  max-width: 34ch;
+}
+
+.footer-col-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-300);
+  margin-bottom: 14px;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.footer-links a {
+  font-size: 16px;
+  color: var(--on-dark-2);
+  cursor: pointer;
+  transition: color 0.16s var(--ease);
+  width: fit-content;
+}
+
+.footer-links a:hover {
+  color: var(--brass-300);
+}
+
+.footer-social {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.footer-social a {
+  border-radius: var(--r-sm);
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule-dark);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--on-dark-2);
+  transition: border-color 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.footer-social a:hover {
+  border-color: var(--brass-300);
+  color: var(--brass-300);
+}
+
+.footer-bottom {
+  border-top: 1px solid var(--rule-dark);
+}
+
+.footer-bottom-inner {
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding: 20px var(--gutter);
+  font-size: 13px;
+  color: var(--on-dark-2);
+}
+
+/* ------------------------- плавающая кнопка звонка ---------------------- */
+
+.float-call {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ------------------------------ модальные окна -------------------------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(14, 32, 19, 0.62);
+  backdrop-filter: blur(3px);
+  animation: fade 0.16s var(--ease);
+}
+
+.dialog {
+  border-radius: var(--r-lg);
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 30px;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.2s var(--ease);
+}
+
+.dialog-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 28px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.dialog-note {
+  font-size: 15px;
+  color: var(--text-2);
+  margin-bottom: 18px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.lightbox {
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 640px;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.2s var(--ease);
+}
+
+.lightbox-sheet {
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  aspect-ratio: 4 / 3;
+  padding: 32px;
+  text-align: center;
+  background: var(--surface);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(20, 37, 26, 0.045) 0 1px,
+    transparent 1px 14px
+  );
+  border-bottom: 1px solid var(--rule);
+}
+
+.lightbox-cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* --------------------------------- тост --------------------------------- */
+
+.toast {
+  border-radius: var(--r-md);
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 70;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 20px;
+  background: var(--green-800);
+  color: var(--on-dark);
+  border: 1px solid var(--green-400);
+  box-shadow: var(--shadow-lg);
+  font-size: 15px;
+  animation: rise 0.2s var(--ease);
+}
+
+.toast-check {
+  color: var(--brass-300);
+  font-weight: 700;
+}
+
+/* -------------------------------- админка ------------------------------- */
+
+.admin {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.admin-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 16px;
+  background: var(--green-900);
+  color: var(--on-dark);
+  border-right: 1px solid var(--green-700);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 8px 18px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule-dark);
+}
+
+.admin-badge {
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--brass-300);
+  color: var(--green-900);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-tab {
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 12px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-align: left;
+  color: var(--on-dark-2);
+  border: 1px solid transparent;
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.admin-tab:hover {
+  background: rgba(238, 243, 232, 0.06);
+  color: var(--on-dark);
+}
+
+.admin-tab.active {
+  background: var(--brass-300);
+  border-color: var(--brass-300);
+  color: var(--green-900);
+}
+
+.admin-tab-count {
+  border-radius: var(--r-xs);
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 5px;
+  display: grid;
+  place-items: center;
+  background: var(--green-600);
+  color: var(--on-dark);
+  font-size: 12px;
+}
+
+.admin-tab.active .admin-tab-count {
+  background: var(--green-900);
+  color: var(--brass-300);
+}
+
+.admin-side-foot {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-side-foot .btn {
+  justify-content: flex-start;
+  color: var(--on-dark-2);
+}
+
+.admin-side-foot .btn:hover {
+  color: var(--brass-300);
+}
+
+.admin-main {
+  padding: 32px 36px 64px;
+  background: var(--paper);
+  overflow-x: hidden;
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  margin-bottom: 26px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.admin-head h1 {
+  font-size: 32px;
+}
+
+.admin-hint {
+  font-size: 15px;
+  color: var(--text-3);
+  margin-top: 8px;
+}
+
+.admin-panel {
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: 4px 20px;
+}
+
+.admin-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.admin-card {
+  border-radius: var(--r-md);
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.admin-card-v {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--green-600);
+}
+
+.admin-card-k {
+  font-size: 14px;
+  color: var(--text-3);
+  margin-top: 7px;
+}
+
+.admin-settings {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+
+.admin-settings-panel {
+  border-radius: var(--r-md);
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+.admin-settings-panel h3 {
+  font-size: 19px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.login-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+  padding: 24px;
+}
+
+.login {
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 380px;
+  padding: 34px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow-md);
+}
+
+.login h1 {
+  font-size: 27px;
+  margin-bottom: 6px;
+}
+
+.login p {
+  font-size: 14px;
+  color: var(--text-3);
+  margin-bottom: 22px;
+}
+
+/* ------------------------------ прочее ---------------------------------- */
+
+.page-head {
+  padding-block: 56px 32px;
+}
+
+.page-head h1 {
+  font-size: clamp(36px, 4.6vw, 56px);
+  margin-top: 12px;
+}
+
+.back-link {
+  /* Именно flex, а не inline-flex: рядом стоящая дата иначе прилипала
+     к ссылке в одну строку («← Все новости8 июля 2026»). */
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: color 0.16s var(--ease);
+}
+
+.back-link:hover {
+  color: var(--green-600);
+}
+
+.state {
+  padding: 72px 20px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.state-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 22px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--paper-2) 25%, #f7f6f1 50%, var(--paper-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.sk-card {
+  border-radius: var(--r-md);
+  height: 320px;
+  border: 1px solid var(--rule);
+}
+
+/* ==========================================================================
+   УСЛУГИ, ШАГИ, АКЦЕНТЫ ГЕРОЯ
+   ========================================================================== */
+
+/* --------------------------------- герой -------------------------------- */
+
+/* Мягкое свечение из-за плеча заголовка — добавляет глубины плоской заливке. */
+.hero-glow {
+  position: absolute;
+  top: -25%;
+  left: -10%;
+  width: 70%;
+  height: 130%;
+  background: radial-gradient(
+    closest-side,
+    rgba(147, 201, 95, 0.16),
+    rgba(147, 201, 95, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ряд доверия под кнопками героя. */
+.hero-trust {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rule-dark);
+}
+
+.hero-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--on-dark-2);
+}
+
+.hero-trust-item .icon {
+  color: var(--brass-300);
+  flex: none;
+}
+
+/* Карточка-«шильдик», наезжающая на угол снимка. */
+.hero-figure-wrap {
+  position: relative;
+}
+
+.hero-plate {
+  position: absolute;
+  right: -14px;
+  bottom: -18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--paper);
+  border: 1px solid var(--brass-400);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-plate-v {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--green-600);
+}
+
+.hero-plate-k {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-2);
+  max-width: 12ch;
+}
+
+/* -------------------------------- услуги -------------------------------- */
+
+.svc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.svc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 26px 24px 24px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: border-color 0.22s var(--ease), transform 0.22s var(--ease),
+    box-shadow 0.22s var(--ease);
+}
+
+/* Латунная полоса растёт сверху вниз по левому краю. */
+.svc::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--brass-500);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.32s var(--ease);
+}
+
+.svc:hover {
+  border-color: var(--green-400);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.svc:hover::before {
+  transform: scaleY(1);
+}
+
+.svc-ico {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-sm);
+  background: var(--green-100);
+  color: var(--green-600);
+  transition: background 0.22s var(--ease), color 0.22s var(--ease),
+    transform 0.32s var(--ease);
+}
+
+.svc:hover .svc-ico {
+  background: var(--green-600);
+  color: var(--brass-300);
+  transform: rotate(-6deg);
+}
+
+.svc h3 {
+  font-size: 23px;
+}
+
+.svc p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-2);
+  flex: 1;
+}
+
+.svc-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green-600);
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
+}
+
+.svc-note .icon {
+  color: var(--brass-600);
+}
+
+/* ------------------------------ как работаем ---------------------------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  counter-reset: step;
+}
+
+.step {
+  position: relative;
+  counter-increment: step;
+  padding: 28px 26px;
+  border: 1px solid var(--rule);
+  border-left: 0;
+  background: var(--surface);
+  transition: background 0.22s var(--ease);
+}
+
+.step:first-child {
+  border-left: 1px solid var(--rule);
+  border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+.step:last-child {
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+.step:hover {
+  background: var(--brass-100);
+}
+
+/* Крупный номер шага — из счётчика, без ручной нумерации в разметке. */
+.step::before {
+  content: '0' counter(step);
+  display: block;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--rule-strong);
+  margin-bottom: 12px;
+  transition: color 0.22s var(--ease);
+}
+
+.step:hover::before {
+  color: var(--brass-500);
+}
+
+/* Стрелка-риска между шагами. */
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 44px;
+  right: -5px;
+  width: 9px;
+  height: 9px;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  transform: rotate(45deg);
+  z-index: 1;
+}
+
+.step h3 {
+  font-size: 21px;
+  margin-bottom: 8px;
+}
+
+.step p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+/* ------------------------------- врезка-цитата -------------------------- */
+
+.pullquote {
+  position: relative;
+  padding: 34px 38px;
+  background: var(--green-800);
+  color: var(--on-dark);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+/* Латунная риска слева — вместо декоративной кавычки: она в крупном
+   кегле читалась как случайные стрелки за текстом. */
+.pullquote::before {
+  content: '';
+  position: absolute;
+  top: 34px;
+  bottom: 34px;
+  left: 0;
+  width: 3px;
+  background: var(--brass-300);
+}
+
+.pullquote p {
+  position: relative;
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: clamp(20px, 2.2vw, 27px);
+  line-height: 1.32;
+  max-width: 54ch;
+}
+
+.pullquote-by {
+  position: relative;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--brass-300);
+  letter-spacing: 0.06em;
+}
+
+/* ==========================================================================
+   ДВИЖЕНИЕ
+   Canvas — частицы, IntersectionObserver — появление, rAF — счётчики,
+   SVG — прорисовка штрихом, CSS-keyframes — лента и микровзаимодействия.
+   ========================================================================== */
+
+/* -------------------------- появление при скролле ----------------------- */
+
+.reveal {
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease),
+    clip-path 0.8s var(--ease);
+  will-change: opacity, transform;
+}
+
+.reveal--up {
+  opacity: 0;
+  transform: translateY(26px);
+}
+
+.reveal--left {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.reveal--right {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.reveal--fade {
+  opacity: 0;
+}
+
+/* Раскрытие шторкой — для крупных изображений. */
+.reveal--clip {
+  opacity: 0;
+  clip-path: inset(0 0 100% 0);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 0 0);
+}
+
+/* ---------------------------- canvas в герое ---------------------------- */
+
+.sunfield {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Контент героя — поверх холста. */
+.hero-inner,
+.stat-strip {
+  z-index: 1;
+}
+
+/* ------------------------------- параллакс ------------------------------ */
+
+.tilt {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.4s var(--ease);
+}
+
+/* -------------------------- шапка при прокрутке ------------------------- */
+
+.nav {
+  transition: box-shadow 0.25s var(--ease), background 0.25s var(--ease);
+}
+
+.nav.is-scrolled {
+  box-shadow: 0 1px 0 var(--rule), 0 6px 22px rgba(20, 37, 26, 0.08);
+  background: rgba(244, 242, 236, 0.96);
+}
+
+.nav-inner {
+  transition: height 0.25s var(--ease);
+}
+
+.nav.is-scrolled .nav-inner {
+  height: 68px;
+}
+
+.brand img {
+  transition: transform 0.3s var(--ease);
+}
+
+.brand:hover img {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+/* Подчёркивание пунктов меню — растёт от левого края. */
+.navlink::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 2px;
+  width: 100%;
+  background: var(--brass-500);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s var(--ease);
+}
+
+.navlink:hover::after {
+  transform: scaleX(1);
+}
+
+.navlink.active::after {
+  transform: scaleX(1);
+}
+
+/* ------------------------------- кнопки --------------------------------- */
+
+/* Блик, проходящий по кнопке при наведении. */
+.btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.btn-primary::after,
+.btn-brass::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -80%;
+  width: 60%;
+  z-index: -1;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.28),
+    transparent
+  );
+  transform: skewX(-18deg);
+  transition: left 0.55s var(--ease);
+}
+
+.btn-primary:hover::after,
+.btn-brass:hover::after {
+  left: 130%;
+}
+
+/* Стрелки уезжают вправо. */
+.btn-ghost,
+.back-link {
+  transition: color 0.16s var(--ease), gap 0.2s var(--ease);
+}
+
+/* --------------------------------- лента -------------------------------- */
+
+.ticker {
+  display: flex;
+  align-items: stretch;
+  border-block: 1px solid var(--rule);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.ticker-label {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 14px 20px;
+  background: var(--green-800);
+  color: var(--brass-300);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ticker-mask {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  /* Края растворяются, лента не обрывается резко. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.ticker-lane {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  height: 100%;
+  animation: ticker-run 38s linear infinite;
+}
+
+.ticker:hover .ticker-lane {
+  animation-play-state: paused;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding-inline: 9px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.ticker-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--brass-500);
+  transform: rotate(45deg);
+}
+
+@keyframes ticker-run {
+  to {
+    /* Лента продублирована — сдвиг ровно на половину бесшовен. */
+    transform: translateX(-50%);
+  }
+}
+
+/* ------------------------------ карточки -------------------------------- */
+
+/* Латунная риска, выезжающая по верхней кромке карточки. */
+.card {
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brass-500);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease);
+  z-index: 2;
+}
+
+.card--link:hover::before {
+  transform: scaleX(1);
+}
+
+.cert {
+  overflow: hidden;
+}
+
+.cert-seal {
+  transition: transform 0.4s var(--ease), background 0.3s var(--ease);
+}
+
+.cert:hover .cert-seal {
+  transform: rotate(360deg);
+  background: var(--brass-100);
+}
+
+/* Показатели в тёмной полосе — лёгкое свечение цифры. */
+.stat-v {
+  transition: text-shadow 0.4s var(--ease);
+}
+
+.stat:hover .stat-v {
+  text-shadow: 0 0 22px rgba(255, 214, 92, 0.45);
+}
+
+/* -------------------------- переход между страниц ----------------------- */
+
+.route-fade {
+  animation: route-in 0.42s var(--ease);
+}
+
+@keyframes route-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Плавающая кнопка — «дышит», пока на неё не навели. */
+.float-call {
+  animation: pulse-ring 2.8s ease-out infinite;
+}
+
+.float-call:hover {
+  animation-play-state: paused;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: var(--shadow-lg), 0 0 0 0 rgba(255, 214, 92, 0.5);
+  }
+  70% {
+    box-shadow: var(--shadow-lg), 0 0 0 16px rgba(255, 214, 92, 0);
+  }
+  100% {
+    box-shadow: var(--shadow-lg), 0 0 0 0 rgba(255, 214, 92, 0);
+  }
+}
+
+/* ------------------------------ адаптив --------------------------------- */
+
+/* Шапка переходит в бургер раньше остальной сетки: пять пунктов, телефон
+   и кнопка перестают помещаться в строку уже около 1040px. */
+@media (max-width: 1040px) {
+  .hide-sm {
+    display: none !important;
+  }
+
+  .nav-burger {
+    display: flex;
+  }
+
+  .nav-phone-sm {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 1000px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding-block: 56px;
+  }
+
+  .stat-strip-inner {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .grid-3,
+  .cert-grid,
+  .prod-grid,
+  .svc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Шаги в две колонки: сбрасываем «ленточные» скругления и стрелки. */
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .step,
+  .step:first-child,
+  .step:last-child {
+    border: 1px solid var(--rule);
+    border-radius: var(--r-md);
+  }
+
+  .step:not(:last-child)::after {
+    display: none;
+  }
+
+  .hero-plate {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .about-grid,
+  .model-layout,
+  .contacts-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .catalog-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Категории списком съедали пол-экрана до первого товара.
+     На узком экране это лента чипов с горизонтальной прокруткой. */
+  .filters {
+    position: static;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .filters-title {
+    display: none;
+  }
+
+  .filters-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    /* Чипы не должны обрываться об край экрана */
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+
+  .filters-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter {
+    flex: none;
+    width: auto;
+    gap: 7px;
+    padding: 9px 15px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+  }
+
+  .filter.active {
+    border-color: var(--green-600);
+  }
+
+  .footer-inner {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  /* Боковое меню становится шапкой: знак, лента вкладок, действия.
+     Раньше кнопки «На сайт» и «Выйти» разъезжались поверх вкладок. */
+  .admin-side {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px var(--gutter);
+    border-right: 0;
+    border-bottom: 1px solid var(--green-700);
+  }
+
+  .admin-brand {
+    width: 100%;
+    padding: 0 0 12px;
+    margin: 0;
+  }
+
+  /* Вкладки — горизонтальная лента, край в край с экраном. */
+  .admin-tabs {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tab {
+    flex: none;
+    border-radius: var(--r-pill);
+    padding: 9px 15px;
+  }
+
+  .admin-side-foot {
+    flex-direction: row;
+    gap: 14px;
+    margin-top: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule-dark);
+  }
+
+  .admin-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-main {
+    padding: 24px 20px 48px;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gutter: 20px;
+  }
+
+  .nav-inner {
+    gap: 14px;
+  }
+
+  .grid-3,
+  .grid-2,
+  .cert-grid,
+  .prod-grid,
+  .svc-grid,
+  .steps,
+  .footer-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .pullquote {
+    padding: 26px 22px;
+  }
+
+  .section {
+    padding-block: 52px;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .model-thumbs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .float-call {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+/* ------------------------- мобильные (≤560px) --------------------------- */
+
+@media (max-width: 560px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  /* Ни один блок не должен создавать горизонтальную прокрутку. */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .hero-inner {
+    padding-block: 40px 48px;
+  }
+
+  .hero h1 {
+    font-size: clamp(32px, 9vw, 40px);
+  }
+
+  .hero p {
+    font-size: 16.5px;
+  }
+
+  /* Кнопки героя — на всю ширину, одинаковые: колонка из разноширотных
+     кнопок выглядит рвано. */
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+    padding-block: 14px;
+  }
+
+  .hero-trust {
+    gap: 10px 18px;
+    margin-top: 24px;
+    padding-top: 18px;
+  }
+
+  /* Шильдик уменьшаем — на узком экране он перекрывал снимок. */
+  .hero-plate {
+    right: 8px;
+    bottom: 8px;
+    gap: 9px;
+    padding: 9px 12px;
+  }
+
+  .hero-plate-v {
+    font-size: 22px;
+  }
+
+  .hero-plate-k {
+    font-size: 10.5px;
+    max-width: 10ch;
+  }
+
+  .stat {
+    padding: 20px 14px;
+  }
+
+  .stat-v {
+    font-size: 27px;
+  }
+
+  /* Ленте на узком экране нужна вся ширина — подпись убираем. */
+  .ticker-label {
+    display: none;
+  }
+
+  .ticker-item {
+    font-size: 13.5px;
+    gap: 14px;
+  }
+
+  .section {
+    padding-block: 44px;
+  }
+
+  .section-head {
+    margin-bottom: 24px;
+  }
+
+  .section-head h2,
+  .about-grid h2 {
+    font-size: clamp(24px, 7vw, 30px);
+  }
+
+  .page-head {
+    padding-block: 36px 24px;
+  }
+
+  .lead {
+    font-size: 16px;
+  }
+
+  .svc,
+  .step {
+    padding: 20px 18px;
+  }
+
+  .banner,
+  .form-panel,
+  .contact-rows {
+    padding: 22px 18px;
+  }
+
+  .card-body {
+    padding: 18px;
+  }
+
+  .card-title {
+    font-size: 20px;
+  }
+
+  .model-title,
+  .article-title {
+    font-size: clamp(26px, 8vw, 34px);
+  }
+
+  .model-actions .btn {
+    width: 100%;
+  }
+
+  .article-body {
+    font-size: 16px;
+  }
+
+  .article-body p:first-child {
+    font-size: 17.5px;
+  }
+
+  .dialog {
+    padding: 22px 18px;
+  }
+
+  .dialog-title {
+    font-size: 22px;
+  }
+
+  /* Кнопки диалога в столбик — рядом они не помещаются. */
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions .btn {
+    width: 100%;
+  }
+
+  /* Плавающая кнопка — только иконка, чтобы не перекрывать контент. */
+  .float-call {
+    right: 14px;
+    bottom: 14px;
+    width: 54px;
+    height: 54px;
+    padding: 0;
+    font-size: 21px;
+    border-radius: var(--r-pill);
+  }
+
+  .float-call span {
+    display: none;
+  }
+
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    transform: none;
+    font-size: 14px;
+  }
+
+  /* Пальцу нужна цель не меньше ~44px. */
+  .nav-mobile .navlink {
+    padding-block: 12px;
+  }
+
+  .filter {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
