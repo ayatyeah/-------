@@ -1,82 +1,209 @@
 /**
  * ИИ-функции сайта: анализатор лидов для админки и чат-ассистент на главной.
  *
- * ─── КАК ЭТО РАБОТАЕТ СЕЙЧАС ───────────────────────────────────────────
- * Код обращения к Claude уже написан и включается сам, как только в .env
- * появится ANTHROPIC_API_KEY. Пока ключа нет, работают правила из
- * fallbackAnalyze / fallbackChat — сайт полностью функционален и без ИИ.
+ * ─── ПРОВАЙДЕРЫ ────────────────────────────────────────────────────────
+ * Порядок такой: Gemini → OpenAI → правила.
+ *   1. Gemini (основной). Ключей может быть до трёх: GEMINI_API_KEY,
+ *      GEMINI_API_KEY_2, GEMINI_API_KEY_3. Если ключ упёрся в лимит (429),
+ *      берём следующий — поэтому их и несколько.
+ *   2. OpenAI (резерв). Включается, когда Gemini не ответил.
+ *   3. Правила. Работают всегда, даже без ключей: сайт остаётся живым.
  *
- * ─── ЧТОБЫ ВКЛЮЧИТЬ ИИ ─────────────────────────────────────────────────
- *   1) npm install @anthropic-ai/sdk
- *   2) в .env добавить: ANTHROPIC_API_KEY=sk-ant-...
- *   3) перезапустить npm run dev:server
- * Больше ничего менять не нужно: эндпоинты и интерфейс те же.
- * ───────────────────────────────────────────────────────────────────────
+ * Внешних библиотек нет — только fetch, он есть в Node 22 из коробки.
+ *
+ * ─── ОСОБЕННОСТЬ gpt-5-mini ────────────────────────────────────────────
+ * Это reasoning-модель: часть бюджета уходит на внутренние рассуждения.
+ * При max_completion_tokens=20 ответ приходит ПУСТОЙ (finish_reason:
+ * 'length') — токены кончились на размышлениях. Поэтому лимиты здесь
+ * заведомо щедрые, иначе получим пустоту вместо текста.
  */
 import * as store from './store.js'
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8'
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini'
 
-/** Клиент создаём один раз и лениво — пакета может не быть вовсе. */
-let clientPromise = null
+const geminiKeys = () =>
+  [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3].filter(
+    Boolean
+  )
 
-export const aiEnabled = () => !!process.env.ANTHROPIC_API_KEY
+const openaiKey = () => process.env.OPENAI_API_KEY || ''
 
-async function getClient() {
-  if (!aiEnabled()) return null
-  if (!clientPromise) {
-    clientPromise = import('@anthropic-ai/sdk')
-      .then(({ default: Anthropic }) => new Anthropic())
-      .catch((e) => {
-        console.warn(
-          '⚠ ANTHROPIC_API_KEY задан, но пакет @anthropic-ai/sdk не установлен.\n' +
-            '  Выполните: npm install @anthropic-ai/sdk\n' +
-            '  Пока работают правила без ИИ. (' + e.message + ')'
-        )
-        return null
-      })
-  }
-  return clientPromise
+/** Включён ли ИИ вообще. */
+export const aiEnabled = () => geminiKeys().length > 0 || !!openaiKey()
+
+/** Какой провайдер сейчас главный — показываем это в интерфейсе честно. */
+export function aiEngine() {
+  if (geminiKeys().length) return 'gemini'
+  if (openaiKey()) return 'openai'
+  return 'rules'
 }
 
-/** Достаёт текст из ответа Claude (content — массив блоков). */
-const textOf = (msg) =>
-  (msg?.content ?? [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
+/* ======================================================================
+   ВЫЗОВЫ ПРОВАЙДЕРОВ
+   ====================================================================== */
+
+const TIMEOUT = 40000
+
+/**
+ * Запрос к Gemini. Перебирает ключи: если один упёрся в лимит или
+ * оказался недействительным, пробуем следующий.
+ * schema — необязательная JSON-схема ответа (Gemini вернёт валидный JSON).
+ */
+async function callGemini({ system, messages, schema, maxTokens = 1200, think = false }) {
+  const keys = geminiKeys()
+  if (!keys.length) return null
+
+  const body = {
+    contents: messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      // 2.5-flash умеет «думать». Для чата это лишняя задержка, а на
+      // разборе заявок размышления окупаются. Бюджет ограничен: без
+      // ограничения (-1) разбор занимал ~16 секунд, менеджер столько ждать
+      // не станет.
+      thinkingConfig: { thinkingBudget: think ? 1024 : 0 },
+      ...(schema ? { responseMimeType: 'application/json', responseSchema: schema } : {}),
+    },
+  }
+  if (system) body.systemInstruction = { parts: [{ text: system }] }
+
+  let lastErr = ''
+  for (const [i, key] of keys.entries()) {
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(TIMEOUT),
+        }
+      )
+
+      if (r.status === 429 || r.status === 403) {
+        lastErr = `ключ ${i + 1}: HTTP ${r.status}`
+        continue // лимит или доступ — пробуем следующий ключ
+      }
+      if (!r.ok) {
+        lastErr = `HTTP ${r.status}: ${(await r.text()).slice(0, 120)}`
+        continue
+      }
+
+      const d = await r.json()
+      const text = (d.candidates?.[0]?.content?.parts ?? [])
+        .map((p) => p.text || '')
+        .join('')
+        .trim()
+      if (text) return text
+      lastErr = 'пустой ответ (' + (d.candidates?.[0]?.finishReason || 'без причины') + ')'
+    } catch (e) {
+      lastErr = e.message.slice(0, 100)
+    }
+  }
+  console.warn('Gemini не ответил:', lastErr)
+  return null
+}
+
+/**
+ * Запрос к OpenAI. Лимит токенов держим большим: reasoning-модели
+ * тратят его на рассуждения и иначе возвращают пустую строку.
+ */
+async function callOpenAI({ system, messages, schema, maxTokens = 2000 }) {
+  const key = openaiKey()
+  if (!key) return null
+
+  const msgs = system ? [{ role: 'system', content: system }, ...messages] : messages
+  const body = {
+    model: OPENAI_MODEL,
+    messages: msgs,
+    max_completion_tokens: maxTokens,
+    ...(schema
+      ? {
+          response_format: {
+            type: 'json_schema',
+            json_schema: { name: 'ответ', schema, strict: true },
+          },
+        }
+      : {}),
+  }
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    if (!r.ok) {
+      console.warn('OpenAI не ответил:', r.status, (await r.text()).slice(0, 120))
+      return null
+    }
+    const d = await r.json()
+    const text = d.choices?.[0]?.message?.content?.trim()
+    if (!text) {
+      // Пустая строка при finish_reason: 'length' — весь бюджет съели рассуждения.
+      console.warn('OpenAI вернул пустоту, finish_reason:', d.choices?.[0]?.finish_reason)
+      return null
+    }
+    return text
+  } catch (e) {
+    console.warn('OpenAI не ответил:', e.message.slice(0, 100))
+    return null
+  }
+}
+
+/** Сначала Gemini, если не вышло — OpenAI. Возвращает {text, engine} или null. */
+async function ask(opts) {
+  const g = await callGemini(opts)
+  if (g) return { text: g, engine: 'gemini' }
+  const o = await callOpenAI(opts)
+  if (o) return { text: o, engine: 'openai' }
+  return null
+}
+
+/** Достаёт JSON из ответа — модель иногда заворачивает его в ```json. */
+function parseJson(text) {
+  try {
+    return JSON.parse(text)
+  } catch {}
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/([[{][\s\S]*[\]}])/)
+  if (m) {
+    try {
+      return JSON.parse(m[1])
+    } catch {}
+  }
+  return null
+}
 
 /* ======================================================================
    1. АНАЛИЗАТОР ЛИДОВ
    ====================================================================== */
 
+/* Схема ответа. Типы заглавными — так их ждёт Gemini; OpenAI понимает и так. */
 const LEAD_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
     leads: {
-      type: 'array',
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          id: { type: 'string', description: 'id заявки из входных данных' },
-          priority: {
-            type: 'string',
-            enum: ['Горячий', 'Тёплый', 'Холодный'],
-            description: 'Насколько заявка близка к сделке',
-          },
-          score: { type: 'integer', description: 'Оценка от 0 до 100' },
-          summary: { type: 'string', description: 'Один короткий вывод по-русски' },
-          action: { type: 'string', description: 'Что менеджеру сделать дальше' },
+          id: { type: 'STRING', description: 'id заявки из входных данных' },
+          priority: { type: 'STRING', enum: ['Горячий', 'Тёплый', 'Холодный'] },
+          score: { type: 'INTEGER', description: 'Оценка 0-100' },
+          summary: { type: 'STRING', description: 'Один короткий вывод по-русски' },
+          action: { type: 'STRING', description: 'Конкретное действие менеджеру' },
         },
         required: ['id', 'priority', 'score', 'summary', 'action'],
-        additionalProperties: false,
       },
     },
-    overview: { type: 'string', description: 'Два-три предложения по всей пачке заявок' },
+    overview: { type: 'STRING', description: 'Два-три предложения по всей пачке' },
   },
   required: ['leads', 'overview'],
-  additionalProperties: false,
 }
 
 const LEAD_SYSTEM = `Ты — аналитик отдела продаж ТОО «СХМ Агро» (производство сельхозтехники в Казахстане: тракторы, комбайны, посевные комплексы).
@@ -87,14 +214,14 @@ const LEAD_SYSTEM = `Ты — аналитик отдела продаж ТОО 
 - Субсидируемая модель — сделка вероятнее: часть цены закрывает государство.
 - Комментарий с количеством или сроком («2 шт до осени») — почти готовая сделка.
 - Заказ звонка без деталей — интерес есть, но неясный.
-- Заявка «Новая» и свежая по дате — важнее давней или уже обработанной.
+- Свежая заявка со статусом «Новая» важнее давней или уже обработанной.
 
-Пиши по-русски, коротко и по делу, без воды и маркетинговых штампов.
-В action пиши конкретное действие («Позвонить сегодня, предложить лизинг»), а не «связаться с клиентом».`
+Пиши по-русски, коротко и по делу, без воды и рекламных штампов.
+В action — конкретное действие («Позвонить сегодня, предложить лизинг»), а не «связаться с клиентом».`
 
 /**
- * Правила на случай, когда ИИ не подключён. Считают тот же формат ответа,
- * поэтому интерфейс админки одинаково работает с ИИ и без него.
+ * Правила на случай, когда ИИ недоступен. Формат ответа тот же,
+ * поэтому админка одинаково работает и с ИИ, и без него.
  */
 function fallbackAnalyze(requests, modelsById) {
   const leads = requests.map((r) => {
@@ -105,7 +232,6 @@ function fallbackAnalyze(requests, modelsById) {
       score += 25
       why.push('запрос КП')
     }
-    // В meta лежит «Модель · Регион» — ищем совпадение с каталогом.
     const model = Object.values(modelsById).find((m) => r.meta?.includes(m.name))
     if (model) {
       score += 20
@@ -122,7 +248,6 @@ function fallbackAnalyze(requests, modelsById) {
     if (r.status === 'Новая') score += 10
     if (r.status === 'Обработана') score -= 30
 
-    // Свежесть: заявка недельной давности слабее вчерашней.
     const days = Math.max(0, Math.round((Date.now() - new Date(r.date).getTime()) / 86400000))
     if (days <= 1) score += 10
     else if (days > 7) score -= 10
@@ -153,27 +278,23 @@ function fallbackAnalyze(requests, modelsById) {
     leads: leads.sort((a, b) => b.score - a.score),
     overview:
       `Разобрано заявок: ${leads.length}, из них горячих — ${hot}. ` +
-      'Оценка сделана по правилам (тип заявки, выбранная модель, субсидия, свежесть). ' +
-      'Подключите ANTHROPIC_API_KEY, чтобы анализ делал Claude и читал комментарии клиентов.',
+      'Оценка сделана по правилам (тип заявки, выбранная модель, субсидия, свежесть).',
     engine: 'rules',
   }
 }
 
-/** Анализирует заявки: Claude, если есть ключ, иначе правила. */
+/** Анализирует заявки: ИИ, если доступен, иначе правила. */
 export async function analyzeLeads() {
   const requests = store.requests.all()
   const modelsById = Object.fromEntries(
     store.models.all({ includeUnpublished: true }).map((m) => [m.id, m])
   )
 
-  if (requests.length === 0) {
-    return { leads: [], overview: 'Заявок пока нет.', engine: aiEnabled() ? 'claude' : 'rules' }
+  if (!requests.length) {
+    return { leads: [], overview: 'Заявок пока нет.', engine: aiEngine() }
   }
+  if (!aiEnabled()) return fallbackAnalyze(requests, modelsById)
 
-  const client = await getClient()
-  if (!client) return fallbackAnalyze(requests, modelsById)
-
-  // Каталог даём моделью, чтобы Claude знал, что субсидируется.
   const catalog = Object.values(modelsById)
     .map((m) => `- ${m.name} (${m.catName}${m.subsidized ? ', субсидируется' : ''})`)
     .join('\n')
@@ -188,39 +309,34 @@ export async function analyzeLeads() {
     status: r.status,
   }))
 
-  try {
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
-      system: LEAD_SYSTEM,
-      thinking: { type: 'adaptive' },
-      output_config: {
-        effort: 'medium',
-        format: { type: 'json_schema', schema: LEAD_SCHEMA },
+  const res = await ask({
+    system: LEAD_SYSTEM,
+    schema: LEAD_SCHEMA,
+    maxTokens: 4000,
+    think: true, // на разборе заявок размышления окупаются
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Сегодня ${new Date().toISOString().slice(0, 10)}.\n\n` +
+          `Каталог техники:\n${catalog}\n\n` +
+          `Заявки (JSON):\n${JSON.stringify(payload, null, 2)}\n\n` +
+          'Оцени каждую заявку и верни JSON по схеме.',
       },
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Сегодня ${new Date().toISOString().slice(0, 10)}.\n\n` +
-            `Каталог техники:\n${catalog}\n\n` +
-            `Заявки (JSON):\n${JSON.stringify(payload, null, 2)}\n\n` +
-            'Оцени каждую заявку и верни JSON по схеме.',
-        },
-      ],
-    })
+    ],
+  })
 
-    const parsed = JSON.parse(textOf(msg))
-    return {
-      leads: (parsed.leads ?? []).sort((a, b) => b.score - a.score),
-      overview: parsed.overview ?? '',
-      engine: 'claude',
-    }
-  } catch (e) {
-    console.error('Claude не ответил, включаю правила:', e.message)
-    const res = fallbackAnalyze(requests, modelsById)
-    res.overview = 'ИИ временно недоступен, оценка по правилам. ' + res.overview
-    return res
+  const parsed = res && parseJson(res.text)
+  if (!parsed?.leads?.length) {
+    const r = fallbackAnalyze(requests, modelsById)
+    r.overview = 'ИИ сейчас недоступен, оценка по правилам. ' + r.overview
+    return r
+  }
+
+  return {
+    leads: parsed.leads.sort((a, b) => b.score - a.score),
+    overview: parsed.overview ?? '',
+    engine: res.engine,
   }
 }
 
@@ -242,7 +358,7 @@ const CHAT_SYSTEM = `Ты — консультант на сайте ТОО «С
 function fallbackChat(message) {
   const q = (message || '').toLowerCase()
   const s = store.settings.publicAll()
-  const has = (...words) => words.some((w) => q.includes(w))
+  const has = (...w) => w.some((x) => q.includes(x))
 
   if (has('привет', 'здравств', 'добрый', 'салам')) {
     return 'Здравствуйте! Подскажу по технике, лизингу, субсидиям и сервису. Что интересует?'
@@ -259,7 +375,7 @@ function fallbackChat(message) {
   }
   if (has('трактор')) {
     const list = store.models.all({ cat: 'traktory' })
-    return `Есть ${list.map((m) => m.name).join(' и ')}. Открыть характеристики можно в каталоге. Подскажите площадь и задачи — поможем выбрать.`
+    return `Есть ${list.map((m) => m.name).join(' и ')}. Характеристики — в каталоге. Подскажите площадь и задачи, поможем выбрать.`
   }
   if (has('комбайн', 'уборк')) {
     const list = store.models.all({ cat: 'kombayny' })
@@ -288,28 +404,22 @@ function fallbackChat(message) {
   return `Не уверен, что понял вопрос. Спросите про каталог, лизинг, субсидии, гарантию или сервис — либо позвоните: ${s.phone}.`
 }
 
-/**
- * Отвечает на сообщение чата.
- * history — массив { role: 'user' | 'assistant', text } предыдущих реплик.
- */
-export async function chat(message, history = []) {
-  const client = await getClient()
-  if (!client) return { reply: fallbackChat(message), engine: 'rules' }
-
-  // Контекст компании собираем из тех же данных, что показывает сайт,
-  // — так ассистент не разойдётся с содержимым каталога.
+/** Собирает контекст компании из тех же данных, что показывает сайт. */
+function companyContext() {
   const s = store.settings.publicAll()
   const catalog = store.models
     .all()
     .map(
       (m) =>
         `- ${m.name} (${m.catName})${m.subsidized ? ' — субсидируется' : ''}: ${m.short}` +
-        (m.specs?.length ? ` [${m.specs.slice(0, 3).map((x) => `${x.k}: ${x.v}`).join('; ')}]` : '')
+        (m.specs?.length
+          ? ` [${m.specs.slice(0, 3).map((x) => `${x.k}: ${x.v}`).join('; ')}]`
+          : '')
     )
     .join('\n')
   const svc = store.services.all().map((x) => `- ${x.title}: ${x.text}`).join('\n')
 
-  const context = `ДАННЫЕ О КОМПАНИИ
+  return `ДАННЫЕ О КОМПАНИИ
 Телефон: ${s.phone}. E-mail: ${s.email}. Адрес: ${s.address}. Часы: ${s.hours}.
 Лизинг — КазАгроФинанс: ${s.leasing_url}. Субсидии — ГосАгро: ${s.subsidy_url}.
 
@@ -318,11 +428,19 @@ ${catalog}
 
 УСЛУГИ
 ${svc}`
+}
+
+/**
+ * Отвечает на сообщение чата.
+ * history — массив { role: 'user' | 'assistant', text } предыдущих реплик.
+ */
+export async function chat(message, history = []) {
+  if (!aiEnabled()) return { reply: fallbackChat(message), engine: 'rules' }
 
   const messages = [
     ...history
       .filter((h) => h?.text)
-      .slice(-8) // хвоста диалога хватает, не тащим всю историю
+      .slice(-8) // хвоста диалога достаточно, всю историю не тащим
       .map((h) => ({
         role: h.role === 'assistant' ? 'assistant' : 'user',
         content: String(h.text).slice(0, 2000),
@@ -330,25 +448,15 @@ ${svc}`
     { role: 'user', content: String(message).slice(0, 2000) },
   ]
 
-  try {
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1000,
-      // Данные компании кэшируем: они одни и те же в каждом запросе чата.
-      system: [
-        { type: 'text', text: CHAT_SYSTEM },
-        { type: 'text', text: context, cache_control: { type: 'ephemeral' } },
-      ],
-      output_config: { effort: 'low' },
-      messages,
-    })
+  const res = await ask({
+    system: CHAT_SYSTEM + '\n\n' + companyContext(),
+    // Чат должен отвечать быстро: у Gemini размышления выключены,
+    // у OpenAI запас токенов побольше — иначе reasoning съест ответ.
+    maxTokens: 1500,
+    think: false,
+    messages,
+  })
 
-    if (msg.stop_reason === 'refusal') {
-      return { reply: `Не смогу ответить на это. Позвоните нам: ${s.phone}.`, engine: 'claude' }
-    }
-    return { reply: textOf(msg) || fallbackChat(message), engine: 'claude' }
-  } catch (e) {
-    console.error('Claude не ответил в чате, включаю правила:', e.message)
-    return { reply: fallbackChat(message), engine: 'rules' }
-  }
+  if (!res) return { reply: fallbackChat(message), engine: 'rules' }
+  return { reply: res.text, engine: res.engine }
 }

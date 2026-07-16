@@ -49,7 +49,7 @@ export const api = {
 
   // --- ИИ ---
   ai: {
-    /** Подключён ли Claude или пока работают правила. */
+    /** Какой движок отвечает: gemini, openai или rules (правила без ИИ). */
     status: () => request('/ai/status'),
     chat: (message, history) => request('/ai/chat', { method: 'POST', body: { message, history } }),
     analyzeLeads: () => request('/ai/analyze-leads', { method: 'POST', auth: true }),

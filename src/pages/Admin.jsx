@@ -480,7 +480,7 @@ function NewsTab({ news, reload }) {
 
 /**
  * Разбирает заявки и говорит, за какую браться первой.
- * Пока Claude не подключён, сервер считает по правилам и честно об этом пишет.
+ * Если ИИ не подключён, сервер считает по правилам и честно об этом пишет.
  */
 function LeadAnalyzer({ requests, byId, setById }) {
   const [busy, setBusy] = useState(false)
@@ -489,7 +489,10 @@ function LeadAnalyzer({ requests, byId, setById }) {
   const [aiOn, setAiOn] = useState(null)
 
   useEffect(() => {
-    api.ai.status().then((s) => setAiOn(s.enabled)).catch(() => setAiOn(false))
+    api.ai
+      .status()
+      .then((s) => setAiOn(s.enabled))
+      .catch(() => setAiOn(false))
   }, [])
 
   async function run() {
@@ -517,7 +520,7 @@ function LeadAnalyzer({ requests, byId, setById }) {
           <h3>ИИ-анализатор лидов</h3>
           <p>
             {aiOn === false
-              ? 'Claude пока не подключён — оценка по правилам (тип заявки, модель, субсидия, свежесть).'
+              ? 'ИИ не подключён — оценка по правилам (тип заявки, модель, субсидия, свежесть).'
               : 'Оценит заявки и подскажет, кому звонить первым.'}
           </p>
         </div>

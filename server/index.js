@@ -287,12 +287,13 @@ app.put('/api/settings', requireAdmin, wrap((req, res) => {
 
 /** Включён ли ИИ — интерфейс показывает это честно, а не притворяется. */
 app.get('/api/ai/status', wrap((_req, res) => {
+  const engine = ai.aiEngine()
   res.json({
     enabled: ai.aiEnabled(),
-    engine: ai.aiEnabled() ? 'claude' : 'rules',
+    engine,
     hint: ai.aiEnabled()
-      ? 'ИИ подключён.'
-      : 'ИИ не подключён: работают правила. Добавьте ANTHROPIC_API_KEY в .env и установите @anthropic-ai/sdk.',
+      ? `ИИ подключён: ${engine}.`
+      : 'ИИ не подключён: работают правила. Добавьте GEMINI_API_KEY или OPENAI_API_KEY в .env.',
   })
 }))
 
@@ -338,6 +339,8 @@ if (existsSync(DIST)) {
 app.listen(PORT, () => {
   console.log(`✓ API СХМ Агро слушает http://localhost:${PORT}`)
   console.log(`  Данные: ${store.STORE_PATH}${seeded ? ' (создан из начальных)' : ''}`)
-  console.log(`  ИИ: ${ai.aiEnabled() ? 'Claude подключён' : 'правила (ANTHROPIC_API_KEY не задан)'}`)
+  console.log(
+    `  ИИ: ${ai.aiEnabled() ? ai.aiEngine() + ' подключён' : 'правила (ключи не заданы)'}`
+  )
   if (existsSync(DIST)) console.log(`  Собранный сайт: http://localhost:${PORT}`)
 })

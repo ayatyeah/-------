@@ -35,8 +35,10 @@ if (pw === 'admin') {
   console.log('  ⚠ Пароль стандартный. Перед публикацией смените ADMIN_PASSWORD в .env')
 }
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.log('\n  ИИ пока не подключён — анализатор лидов и чат работают на правилах.')
-  console.log('  Чтобы включить Claude: npm install @anthropic-ai/sdk')
-  console.log('  и добавить ANTHROPIC_API_KEY в .env')
+if (process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY) {
+  const engine = process.env.GEMINI_API_KEY ? 'Gemini' : 'OpenAI'
+  console.log(`\n  ИИ подключён (${engine}): чат на главной и анализатор лидов в админке.`)
+} else {
+  console.log('\n  ИИ не подключён — чат и анализатор лидов работают на правилах.')
+  console.log('  Чтобы включить: добавьте GEMINI_API_KEY или OPENAI_API_KEY в .env')
 }
