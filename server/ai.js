@@ -98,7 +98,18 @@ async function callGemini({ system, messages, schema, maxTokens = 1200, think = 
         .map((p) => p.text || '')
         .join('')
         .trim()
-      if (text) return text
+      if (text) {
+        const u = d.usageMetadata ?? {}
+        return {
+          text,
+          usage: {
+            вход: u.promptTokenCount ?? 0,
+            размышления: u.thoughtsTokenCount ?? 0,
+            ответ: u.candidatesTokenCount ?? 0,
+            всего: u.totalTokenCount ?? 0,
+          },
+        }
+      }
       lastErr = 'пустой ответ (' + (d.candidates?.[0]?.finishReason || 'без причины') + ')'
     } catch (e) {
       lastErr = e.message.slice(0, 100)
@@ -149,20 +160,47 @@ async function callOpenAI({ system, messages, schema, maxTokens = 2000 }) {
       console.warn('OpenAI вернул пустоту, finish_reason:', d.choices?.[0]?.finish_reason)
       return null
     }
-    return text
+    const u = d.usage ?? {}
+    return {
+      text,
+      usage: {
+        вход: u.prompt_tokens ?? 0,
+        размышления: u.completion_tokens_details?.reasoning_tokens ?? 0,
+        ответ: (u.completion_tokens ?? 0) - (u.completion_tokens_details?.reasoning_tokens ?? 0),
+        всего: u.total_tokens ?? 0,
+      },
+    }
   } catch (e) {
     console.warn('OpenAI не ответил:', e.message.slice(0, 100))
     return null
   }
 }
 
-/** Сначала Gemini, если не вышло — OpenAI. Возвращает {text, engine} или null. */
+/**
+ * Сначала Gemini, если не вышло — OpenAI.
+ * Возвращает { text, engine, usage } или null.
+ * Расход токенов пишем в лог: по нему видно, во что обходится ИИ.
+ */
 async function ask(opts) {
   const g = await callGemini(opts)
-  if (g) return { text: g, engine: 'gemini' }
+  if (g) {
+    logUsage('gemini', opts.label, g.usage)
+    return { text: g.text, engine: 'gemini', usage: g.usage }
+  }
   const o = await callOpenAI(opts)
-  if (o) return { text: o, engine: 'openai' }
+  if (o) {
+    logUsage('openai', opts.label, o.usage)
+    return { text: o.text, engine: 'openai', usage: o.usage }
+  }
   return null
+}
+
+function logUsage(engine, label, u) {
+  if (!u) return
+  console.log(
+    `  [ИИ] ${engine} · ${label ?? 'запрос'}: вход ${u.вход}, размышления ${u.размышления}, ` +
+      `ответ ${u.ответ}, всего ${u.всего} токенов`
+  )
 }
 
 /** Достаёт JSON из ответа — модель иногда заворачивает его в ```json. */
@@ -283,23 +321,36 @@ function fallbackAnalyze(requests, modelsById) {
   }
 }
 
+/**
+ * Сколько заявок отдаём ИИ за раз. Ограничение не ради экономии, а ради
+ * работоспособности: на 50 заявках ответ упирался в лимит токенов, JSON
+ * обрывался и разбор молча откатывался на правила. Что не влезло —
+ * честно пишем в overview, а не прячем.
+ */
+const LEADS_PER_RUN = 30
+
 /** Анализирует заявки: ИИ, если доступен, иначе правила. */
 export async function analyzeLeads() {
-  const requests = store.requests.all()
+  const all = store.requests.all()
   const modelsById = Object.fromEntries(
     store.models.all({ includeUnpublished: true }).map((m) => [m.id, m])
   )
 
-  if (!requests.length) {
+  if (!all.length) {
     return { leads: [], overview: 'Заявок пока нет.', engine: aiEngine() }
   }
-  if (!aiEnabled()) return fallbackAnalyze(requests, modelsById)
+  if (!aiEnabled()) return fallbackAnalyze(all, modelsById)
+
+  // Сначала те, с которыми ещё работать: обработанные менеджеру не нужны.
+  const actionable = all.filter((r) => r.status !== 'Обработана')
+  const queue = (actionable.length ? actionable : all).slice(0, LEADS_PER_RUN)
+  const skipped = (actionable.length ? actionable : all).length - queue.length
 
   const catalog = Object.values(modelsById)
     .map((m) => `- ${m.name} (${m.catName}${m.subsidized ? ', субсидируется' : ''})`)
     .join('\n')
 
-  const payload = requests.map((r) => ({
+  const payload = queue.map((r) => ({
     id: r.id,
     date: r.date,
     type: r.type,
@@ -309,10 +360,15 @@ export async function analyzeLeads() {
     status: r.status,
   }))
 
+  // Бюджет ответа считаем от числа заявок: замерено ~95 токенов на заявку
+  // плюс до ~1000 на размышления. Фиксированные 4000 обрывали разбор.
+  const maxTokens = Math.min(16000, 1500 + queue.length * 130)
+
   const res = await ask({
+    label: `разбор ${queue.length} заявок`,
     system: LEAD_SYSTEM,
     schema: LEAD_SCHEMA,
-    maxTokens: 4000,
+    maxTokens,
     think: true, // на разборе заявок размышления окупаются
     messages: [
       {
@@ -328,14 +384,19 @@ export async function analyzeLeads() {
 
   const parsed = res && parseJson(res.text)
   if (!parsed?.leads?.length) {
-    const r = fallbackAnalyze(requests, modelsById)
+    const r = fallbackAnalyze(all, modelsById)
     r.overview = 'ИИ сейчас недоступен, оценка по правилам. ' + r.overview
     return r
   }
 
+  let overview = parsed.overview ?? ''
+  if (skipped > 0) {
+    overview += ` Показаны ${queue.length} заявок из ${queue.length + skipped}: остальные разберутся при следующем запуске.`
+  }
+
   return {
     leads: parsed.leads.sort((a, b) => b.score - a.score),
-    overview: parsed.overview ?? '',
+    overview,
     engine: res.engine,
   }
 }
@@ -449,6 +510,7 @@ export async function chat(message, history = []) {
   ]
 
   const res = await ask({
+    label: `чат (реплик в истории: ${messages.length})`,
     system: CHAT_SYSTEM + '\n\n' + companyContext(),
     // Чат должен отвечать быстро: у Gemini размышления выключены,
     // у OpenAI запас токенов побольше — иначе reasoning съест ответ.
