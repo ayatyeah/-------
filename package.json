@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "ТОО «СХМ Агро» — производство и продажа сельхозтехники",
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "scripts": {
     "init-db": "node --env-file-if-exists=.env server/init-db.js",
     "dev:server": "node --env-file-if-exists=.env --watch server/index.js",
