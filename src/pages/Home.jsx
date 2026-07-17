@@ -11,10 +11,9 @@ import Services from '../components/Services'
 import Steps from '../components/Steps'
 import Icon from '../components/Icon'
 import WhatWeDo from '../components/WhatWeDo'
+import Production from '../components/Production'
 import { api } from '../api'
 import { useFetch } from '../store'
-
-const PRODUCTION = ['Сборочный цех', 'Линия покраски', 'Испытательный полигон']
 
 const TRUST = [
   { icon: 'shield', t: 'Гарантия 2 года' },
@@ -199,41 +198,8 @@ export default function Home() {
       {/* как работаем */}
       <Steps />
 
-      {/* врезка-цитата */}
-      <section className="section--tight">
-        <div className="wrap">
-          <Reveal className="pullquote">
-            <p>
-              Мы не продаём технику, которая не нужна. Если хозяйству хватит машины проще —
-              скажем прямо: репутация дороже одной сделки.
-            </p>
-            <div className="pullquote-by">Ерлан Абдразаков, директор по продажам</div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ---------------------------- производство -------------------------- */}
-      <section className="section" id="production">
-        <div className="wrap">
-          <Reveal as="span" className="kicker">
-            Собственное производство
-          </Reveal>
-          <div className="section-head" style={{ marginBottom: 0 }}>
-            <Reveal as="h2" delay={60}>
-              Цех, а не перепродажа
-            </Reveal>
-          </div>
-          <div className="prod-grid">
-            {PRODUCTION.map((label, i) => (
-              <Reveal className="prod-cell" key={label} variant="clip" delay={i * 110}>
-                <div className="media-stub">
-                  <span>{label}</span>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* производство — тёмная глава, цитата директора закрывает её */}
+      <Production quote />
 
       {/* ---------------------------- сертификаты --------------------------- */}
       <section className="section">
@@ -273,7 +239,7 @@ export default function Home() {
       </section>
 
       {/* -------------------------- лизинг и субсидии ----------------------- */}
-      <section className="section">
+      <section className="section section--alt">
         <div className="wrap">
           <div className="grid-2">
             <Reveal className="banner frame" variant="left">

@@ -6,7 +6,7 @@ export default function Services({ items = [] }) {
   if (items.length === 0) return null
 
   return (
-    <section className="section" id="services">
+    <section className="section section--alt" id="services">
       <div className="wrap">
         <Reveal as="span" className="kicker">
           Услуги

@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import Reveal, { CountUp } from '../components/Reveal'
-
-const PRODUCTION = ['Сборочный цех', 'Линия покраски', 'Испытательный полигон']
+import Production from '../components/Production'
 
 export default function About() {
   // Показатели и сертификаты уже загружены провайдером — второй запрос не нужен.
@@ -90,24 +89,8 @@ export default function About() {
       </section>
 
 
-      {/* производство */}
-      <section className="section">
-        <div className="wrap">
-          <span className="kicker">Собственное производство</span>
-          <div className="section-head" style={{ marginBottom: 0 }}>
-            <h2>Цех, а не перепродажа</h2>
-          </div>
-          <div className="prod-grid">
-            {PRODUCTION.map((label, i) => (
-              <Reveal className="prod-cell" key={label} variant="clip" delay={i * 110}>
-                <div className="media-stub">
-                  <span>{label}</span>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* производство — без цитаты: ниже своя линия повествования */}
+      <Production />
 
       {/* сертификаты списком */}
       <section className="section">

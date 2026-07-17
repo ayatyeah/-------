@@ -169,8 +169,23 @@ h4 {
   padding-block: 48px;
 }
 
+/* Приглушённая полоса. Разница с --paper всего в пару тонов и в упор почти
+   не видна — она и не должна быть видна в упор. Её работа в другом: при
+   прокрутке она отбивает соседние разделы друг от друга, чтобы страница
+   читалась главами, а не одним полотном. */
+.section--alt {
+  background: var(--paper-2);
+}
+
 .section + .section {
   border-top: 1px solid var(--rule);
+}
+
+/* Там, где разделы уже разведены фоном, линейка между ними лишняя:
+   получается шов на границе двух заливок. */
+.section--alt + .section,
+.section + .section--alt {
+  border-top: 0;
 }
 
 /* Надзаголовок раздела — узкий, разрядка, латунная метка слева. */
@@ -927,24 +942,113 @@ h4 {
   margin-top: 8px;
 }
 
-/* ------------------------------- производство --------------------------- */
+/* ==========================================================================
+   ПРОИЗВОДСТВО — тёмная глава
+   Середина страницы шла девятью светлыми секциями подряд: ритма нет, глазу
+   не за что зацепиться. Тёмная полоса делит ленту пополам, и делит там, где
+   это совпадает со смыслом: здесь главное утверждение компании — технику
+   делаем сами. Раньше это утверждение было набрано тремя пустыми плашками
+   под фото, которых нет; теперь текстом, который работает и без фото.
+   ========================================================================== */
+
+/* Была косая штриховка «под цех». В макете читалась не фактурой, а полосами,
+   и просвечивала сквозь полупрозрачные карточки. Полоса работает сама по
+   себе — тёмным против светлого, без узора. */
+.band--dark {
+  position: relative;
+  overflow: hidden;
+  padding-block: 84px;
+  background: var(--green-900);
+  color: var(--on-dark);
+}
+
+.band--dark > .wrap {
+  position: relative;
+}
+
+.band--dark h2 {
+  color: var(--on-dark);
+}
+
+.band--dark .lead {
+  color: var(--on-dark-2);
+}
 
 .prod-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
-  margin-top: 28px;
+  margin-top: 34px;
 }
 
-.prod-cell {
+.prod-grid > * {
+  min-width: 0;
+}
+
+.prod-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  height: 100%;
+  padding: 26px 24px 28px;
+  border: 1px solid var(--rule-dark);
   border-radius: var(--r-md);
-  position: relative;
-  aspect-ratio: 4 / 3;
-  background: var(--green-800);
-  border: 1px solid var(--rule);
+  background: rgba(238, 243, 232, 0.045);
+  transition: background 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+.prod-stage:hover {
+  background: rgba(238, 243, 232, 0.075);
+  border-color: rgba(255, 214, 92, 0.3);
+}
+
+.prod-stage-icon {
   display: grid;
   place-items: center;
-  overflow: hidden;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 214, 92, 0.1);
+  color: var(--brass-300);
+}
+
+.prod-stage-num {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.18em;
+  color: var(--brass-400);
+}
+
+.prod-stage h3 {
+  font-size: 21px;
+  line-height: 1.2;
+  color: var(--on-dark);
+}
+
+.prod-stage p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--on-dark-2);
+}
+
+/* Цитата закрывает главу. Внутри тёмной полосы своя заливка ей не нужна —
+   остаются латунная риска и линейка сверху.
+   Селектор намеренно из двух классов: у голого .pullquote--bare тот же вес,
+   что и у .pullquote, а .pullquote объявлен ниже по файлу — и побеждал бы
+   заливкой и скруглением просто потому, что идёт последним. */
+.band--dark .pullquote--bare {
+  margin-top: 44px;
+  padding: 34px 0 0 26px;
+  background: transparent;
+  border-top: 1px solid var(--rule-dark);
+  border-radius: 0;
+}
+
+.band--dark .pullquote--bare::before {
+  top: 34px;
+  bottom: 0;
 }
 
 /* -------------------------------- каталог ------------------------------- */
@@ -3262,29 +3366,36 @@ select.input {
   .grid-2,
   .svc-grid,
   .steps,
+  .prod-grid,
   .footer-inner {
     grid-template-columns: 1fr;
   }
 
-  /* Цеха пока без фотографий — три большие заглушки съедали целый экран,
-     на котором нечего смотреть. На телефоне показываем их лентой. */
+  /* Раньше цеха были пустыми плашками, и на телефоне они ехали лентой вбок:
+     листать три пустых прямоугольника дешевле, чем отдать им целый экран.
+     Теперь в них текст — его прячут за горизонтальной прокруткой только
+     во вред, поэтому обычная колонка. */
   .prod-grid {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    margin-inline: calc(var(--gutter) * -1);
-    padding-inline: var(--gutter);
-    scrollbar-width: none;
+    gap: 12px;
   }
 
-  .prod-grid::-webkit-scrollbar {
-    display: none;
+  .band--dark {
+    padding-block: 56px;
   }
 
-  .prod-cell {
-    flex: none;
-    width: 210px;
-    aspect-ratio: 3 / 2;
+  .prod-stage {
+    padding: 22px 20px 24px;
+  }
+
+  /* Вес селектора тот же, что у базового правила выше: с одним классом
+     это переопределение молча не сработало бы. */
+  .band--dark .pullquote--bare {
+    margin-top: 32px;
+    padding: 26px 0 0 18px;
+  }
+
+  .band--dark .pullquote--bare::before {
+    top: 26px;
   }
 
   /* Сертификаты — в два столбца: карточка это заголовок и подпись. */
