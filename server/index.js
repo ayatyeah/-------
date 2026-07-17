@@ -41,6 +41,11 @@ app.use((_req, res, next) => {
 
 const PORT = process.env.PORT || 3001
 
+/* Слушаем на всех интерфейсах явно.
+   В контейнере (Railway, Docker) запросы приходят снаружи, и привязка к
+   localhost сделала бы сервис недоступным при живом процессе. */
+const HOST = process.env.HOST || '0.0.0.0'
+
 /**
  * Ограничитель частоты по IP. Формы заявок открыты всему интернету —
  * без него база забивается спамом, а пароль админки перебирается.
@@ -336,11 +341,38 @@ if (existsSync(DIST)) {
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(DIST, 'index.html')))
 }
 
-app.listen(PORT, () => {
-  console.log(`✓ API СХМ Агро слушает http://localhost:${PORT}`)
+/**
+ * Проверки окружения. Обе описывают отказы, которые уже случались на Railway
+ * и оба раза выглядели как что угодно, только не своя причина, — поэтому
+ * сервер говорит о них сам, в первых строках лога.
+ */
+function проверитьОкружение() {
+  const вКонтейнере = !!(process.env.RAILWAY_ENVIRONMENT || process.env.PORT)
+
+  if (!process.env.PORT) {
+    console.warn(
+      `\n  ⚠ PORT не задан — слушаю запасной ${PORT}.\n` +
+        '    Если это Railway: платформа шлёт трафик на свой порт, а не на этот,\n' +
+        '    и снаружи сайт ответит «Application failed to respond».\n' +
+        '    Лечится переменной PORT в Variables.\n'
+    )
+  }
+
+  if (вКонтейнере && !process.env.STORE_PATH) {
+    console.warn(
+      `\n  ⚠ STORE_PATH не задан — данные лежат в ${store.STORE_PATH}, внутри контейнера.\n` +
+        '    Он пересоздаётся при каждом деплое: заявки клиентов будут ПОТЕРЯНЫ.\n' +
+        '    Лечится диском на /data и переменной STORE_PATH=/data/store.json.\n'
+    )
+  }
+}
+
+app.listen(PORT, HOST, () => {
+  console.log(`✓ API СХМ Агро слушает ${HOST}:${PORT}`)
   console.log(`  Данные: ${store.STORE_PATH}${seeded ? ' (создан из начальных)' : ''}`)
   console.log(
     `  ИИ: ${ai.aiEnabled() ? ai.aiEngine() + ' подключён' : 'правила (ключи не заданы)'}`
   )
-  if (existsSync(DIST)) console.log(`  Собранный сайт: http://localhost:${PORT}`)
+  if (existsSync(DIST)) console.log('  Собранный сайт отдаётся с этого же порта')
+  проверитьОкружение()
 })
