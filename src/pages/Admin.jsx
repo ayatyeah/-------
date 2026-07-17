@@ -538,6 +538,24 @@ function LeadAnalyzer({ requests, byId, setById }) {
             <span>{result.overview}</span>
           </div>
 
+          {/* Откуда взялись оценки. Без этой строки непонятно, почему
+              «Пересчитать» иногда срабатывает мгновенно. */}
+          <div className="ai-source">
+            {result.fromCache > 0 && (
+              <span>
+                Из кэша: {result.fromCache} — эти заявки не менялись с прошлого разбора,
+                ИИ их не пересчитывал.
+              </span>
+            )}
+            {result.analyzed > 0 && <span>Разобрано заново: {result.analyzed}.</span>}
+            {result.leads.some((l) => l.byRules) && (
+              <span>
+                Оценок по правилам: {result.leads.filter((l) => l.byRules).length} — ИИ пропустил
+                эти заявки, они посчитаны без него.
+              </span>
+            )}
+          </div>
+
           <div className="ai-leads">
             {result.leads.map((l) => {
               const r = requests.find((x) => x.id === l.id)
@@ -550,7 +568,10 @@ function LeadAnalyzer({ requests, byId, setById }) {
                       <b>{r?.fio ?? l.id}</b>
                       {r && <span className="ai-lead-meta">{r.meta}</span>}
                     </div>
-                    <div className="ai-lead-sum">{l.summary}</div>
+                    <div className="ai-lead-sum">
+                      {l.summary}
+                      {l.byRules && <span className="ai-lead-rules">по правилам</span>}
+                    </div>
                     <div className="ai-lead-act">
                       <Icon name="bolt" size={13} />
                       {l.action}

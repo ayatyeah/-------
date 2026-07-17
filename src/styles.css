@@ -2746,11 +2746,37 @@ select.input {
   margin-top: 3px;
 }
 
+/* Откуда взялись оценки: что из кэша, что посчитано заново, что — правилами.
+   Тихая строка: менеджеру она нужна, только когда он задаётся вопросом,
+   почему «Пересчитать» отработало мгновенно. */
+.ai-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  padding-inline: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
 .ai-leads {
   display: flex;
   flex-direction: column;
   gap: 9px;
   margin-top: 14px;
+}
+
+/* Пометка у заявки, которую ИИ пропустил и посчитали правилами. */
+.ai-lead-rules {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xs);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  white-space: nowrap;
 }
 
 .ai-lead {

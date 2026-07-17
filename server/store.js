@@ -46,6 +46,7 @@ function freshData() {
     stats: seed.stats.map((s, i) => ({ ...s, id: i + 1 })),
     requests: seed.requests.map((r) => ({ ...r, comment: '' })),
     settings: { ...seed.settings },
+    aiCache: {},
   }
 }
 
@@ -295,4 +296,61 @@ export const settings = {
     save()
     return settings.publicAll()
   },
+}
+
+/* ------------------------------- кэш ИИ --------------------------------- */
+
+/* Сколько записей держим. Кэш лежит в том же store.json, что и контент,
+   поэтому расти без предела ему нельзя: при переполнении выбрасываем самые
+   давно записанные. */
+const AI_CACHE_MAX = 500
+
+/**
+ * Кэш ответов ИИ: платить за один и тот же вопрос дважды незачем.
+ * Ключ задаёт вызывающая сторона и включает в себя всё, от чего ответ
+ * зависит, — иначе кэш начнёт врать (см. ai.js).
+ *
+ * Живёт в snapshot'е вместе с контентом и переживает перезапуск: на Railway
+ * контейнер поднимается заново часто, и кэш в памяти терялся бы каждый раз.
+ */
+export const aiCache = {
+  get(key) {
+    const e = data.aiCache?.[key]
+    if (!e) return null
+    if (e.exp && e.exp < Date.now()) {
+      delete data.aiCache[key]
+      save()
+      return null
+    }
+    return clone(e.v)
+  },
+
+  set(key, value, ttlMs = 0) {
+    data.aiCache ??= {}
+    data.aiCache[key] = { v: value, at: Date.now(), exp: ttlMs ? Date.now() + ttlMs : 0 }
+
+    const keys = Object.keys(data.aiCache)
+    if (keys.length > AI_CACHE_MAX) {
+      keys
+        .sort((a, b) => (data.aiCache[a].at ?? 0) - (data.aiCache[b].at ?? 0))
+        .slice(0, keys.length - AI_CACHE_MAX)
+        .forEach((k) => delete data.aiCache[k])
+    }
+    save()
+  },
+
+  /** Чистка: всё сразу или только ключи с указанным префиксом. */
+  clear(prefix = '') {
+    if (!prefix) {
+      data.aiCache = {}
+    } else {
+      for (const k of Object.keys(data.aiCache ?? {})) {
+        if (k.startsWith(prefix)) delete data.aiCache[k]
+      }
+    }
+    save()
+    return aiCache.size()
+  },
+
+  size: () => Object.keys(data.aiCache ?? {}).length,
 }
