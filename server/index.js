@@ -9,7 +9,7 @@
 import express from 'express'
 import cors from 'cors'
 import compression from 'compression'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -20,6 +20,14 @@ import { REGIONS } from './seed.js'
 const { seeded } = store.load()
 
 const app = express()
+
+/* За прокси (Railway, любой reverse-proxy) настоящий IP клиента лежит в
+   X-Forwarded-For, а req.socket видит только адрес прокси. Без этой строки
+   ограничитель частоты считал бы всех посетителей одним IP: один спамер
+   выбирал бы лимит сразу для всех, а отдельного злоумышленника было бы не
+   отсечь. '1' — доверяем ровно одному прокси (столько их у Railway). */
+app.set('trust proxy', 1)
+
 // gzip: JSON-ответы сжимаются в 3–5 раз, а каталог со спеками весит заметно.
 app.use(compression())
 // Кого пускаем к API. По умолчанию — только vite-клиент; на проде
@@ -31,11 +39,38 @@ app.use(express.json({ limit: '64kb' }))
 app.set('etag', 'strong')
 app.disable('x-powered-by')
 
-// Базовые защитные заголовки — без лишних зависимостей.
+/* Политика ресурсов (CSP). Всё своё, со своего же домена: скрипты и стили
+   собраны Vite, шрифты и картинки лежат в /assets и /fonts, запросы ИИ идут
+   на свой же /api. Отсюда почти везде 'self'.
+   - style-src разрешает inline: React расставляет стили через style={{…}},
+     это inline-атрибуты, без 'unsafe-inline' они бы отвалились;
+   - script-src БЕЗ inline: исполняемых инлайн-скриптов на странице нет
+     (JSON-LD — это данные, не скрипт), поэтому строгий 'self';
+   - object/base/frame-ancestors закрыты: ни встраиваний, ни подмены base,
+     ни показа сайта в чужом iframe (кликджекинг). */
+const CSP = [
+  "default-src 'self'",
+  "img-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self'",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join('; ')
+
+// Защитные заголовки — без лишних зависимостей.
+const PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Content-Security-Policy', CSP)
+  // HSTS только на проде за HTTPS: на localhost без TLS он бы намертво
+  // заставил браузер ходить по https и сломал бы разработку.
+  if (PROD) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains')
   next()
 })
 
@@ -110,12 +145,64 @@ const clean = (v, max) =>
  */
 const adminPassword = () => process.env.ADMIN_PASSWORD || store.settings.get('admin_password')
 
-/** Токен сессии админа — производная от пароля, живёт до перезапуска сервера. */
-const tokenFor = (password) => createHash('sha256').update(`shm-agro:${password}`).digest('hex')
+/* ─── Сессия админки ────────────────────────────────────────────────────
+   Раньше токен был просто sha256('shm-agro:' + пароль): без срока жизни, один
+   и тот же при каждом входе, и по сути равный хэшу пароля. Утечка такого
+   токена (localStorage, чужой компьютер, лог) = утечка пароля навсегда,
+   отозвать его нельзя.
+
+   Теперь токен подписан и ограничен по времени: payload с меткой истечения +
+   HMAC-подпись. Ключ подписи привязан и к паролю — сменили ADMIN_PASSWORD,
+   и все прежние сессии мертвы. Токен уже не восстанавливает пароль и сам
+   протухает.
+
+   SESSION_SECRET берём из JWT_SECRET; если он не задан — разовый ключ на
+   запуск. Тогда сессии не переживают перезапуск (после каждого деплоя вход
+   заново) — не идеально для удобства, но безопасно; чтобы сессии жили,
+   задайте JWT_SECRET. */
+const SESSION_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex')
+const SESSION_TTL_MS = Math.max(1, Number(process.env.SESSION_TTL_HOURS) || 12) * 3600 * 1000
+
+const signingKey = () => createHmac('sha256', SESSION_SECRET).update('sess:' + adminPassword()).digest()
+
+const b64url = (buf) => Buffer.from(buf).toString('base64url')
+
+/**
+ * Сравнение за постоянное время. Обе стороны сводим к 32-байтному дайджесту:
+ * timingSafeEqual требует равной длины, а так не течёт ни содержимое, ни
+ * длина исходных строк.
+ */
+function safeEqual(a, b) {
+  const ha = createHash('sha256').update(String(a)).digest()
+  const hb = createHash('sha256').update(String(b)).digest()
+  return timingSafeEqual(ha, hb)
+}
+
+/** Выдаёт подписанный токен со сроком жизни. */
+function issueToken(ttl = SESSION_TTL_MS) {
+  const payload = b64url(JSON.stringify({ exp: Date.now() + ttl }))
+  const sig = b64url(createHmac('sha256', signingKey()).update(payload).digest())
+  return `${payload}.${sig}`
+}
+
+/** Проверяет подпись и срок. Любая нестыковка — false, без подробностей. */
+function verifyToken(token) {
+  if (typeof token !== 'string' || !token.includes('.')) return false
+  const [payload, sig] = token.split('.')
+  if (!payload || !sig) return false
+  const expected = b64url(createHmac('sha256', signingKey()).update(payload).digest())
+  if (!safeEqual(sig, expected)) return false
+  try {
+    const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    return typeof exp === 'number' && Date.now() < exp
+  } catch {
+    return false
+  }
+}
 
 const requireAdmin = (req, res, next) => {
   const sent = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
-  if (sent && sent === tokenFor(adminPassword())) return next()
+  if (sent && verifyToken(sent)) return next()
   res.status(401).json({ error: 'Требуется вход в админку' })
 }
 
@@ -132,9 +219,9 @@ const wrap = (fn) => async (req, res) => {
 /* --------------------------------- auth -------------------------------- */
 
 app.post('/api/login', limitLogin, wrap((req, res) => {
-  const { password } = req.body || {}
-  if (password && password === adminPassword()) {
-    return res.json({ token: tokenFor(password) })
+  const password = typeof req.body?.password === 'string' ? req.body.password : ''
+  if (password && safeEqual(password, adminPassword())) {
+    return res.json({ token: issueToken(), expiresInHours: SESSION_TTL_MS / 3600000 })
   }
   res.status(401).json({ error: 'Неверный пароль' })
 }))
@@ -363,6 +450,22 @@ function проверитьОкружение() {
       `\n  ⚠ STORE_PATH не задан — данные лежат в ${store.STORE_PATH}, внутри контейнера.\n` +
         '    Он пересоздаётся при каждом деплое: заявки клиентов будут ПОТЕРЯНЫ.\n' +
         '    Лечится диском на /data и переменной STORE_PATH=/data/store.json.\n'
+    )
+  }
+
+  if (adminPassword() === 'admin') {
+    console.warn(
+      '\n  ⚠ ADMIN_PASSWORD = «admin» — стандартный пароль.\n' +
+        '    На публичном адресе в админку войдёт кто угодно и удалит каталог,\n' +
+        '    новости и заявки. Задайте свой пароль переменной ADMIN_PASSWORD.\n'
+    )
+  }
+
+  if (вКонтейнере && !process.env.JWT_SECRET) {
+    console.warn(
+      '\n  ⚠ JWT_SECRET не задан — сессии админки подписаны разовым ключом и\n' +
+        '    слетают при каждом перезапуске (после деплоя придётся входить заново).\n' +
+        '    Задайте JWT_SECRET (длинная случайная строка), чтобы сессии жили.\n'
     )
   }
 }
