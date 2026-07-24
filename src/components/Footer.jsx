@@ -2,6 +2,12 @@ import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import Icon from './Icon'
 
+const SOCIAL = [
+  { key: 'instagram_url', name: 'Instagram' },
+  { key: 'telegram_url', name: 'Telegram' },
+  { key: 'whatsapp_url', name: 'WhatsApp' },
+]
+
 export default function Footer() {
   const { settings, openCall } = useSite()
   const telHref = `tel:${settings.phone.replace(/[^\d+]/g, '')}`
@@ -24,7 +30,6 @@ export default function Footer() {
             <Link to="/about">О компании</Link>
             <Link to="/news">Новости</Link>
             <Link to="/contacts">Контакты</Link>
-            <Link to="/privacy">Политика конфиденциальности</Link>
           </div>
         </div>
 
@@ -46,22 +51,33 @@ export default function Footer() {
           <button type="button" className="btn btn-brass btn-block" onClick={openCall}>
             Заказать звонок
           </button>
+          {/* Значок появляется только когда адрес задан в админке.
+              Ссылка, которая никуда не ведёт, хуже её отсутствия: человек
+              жмёт и решает, что сайт сломан. */}
           <div className="footer-social">
-            <a href="#" aria-label="Instagram">
-              <Icon name="instagram" size={19} />
-            </a>
-            <a href="#" aria-label="Telegram">
-              <Icon name="telegram" size={19} />
-            </a>
-            <a href="#" aria-label="WhatsApp">
-              <Icon name="whatsapp" size={19} />
-            </a>
+            {SOCIAL.map(({ key, name }) =>
+              settings[key] ? (
+                <a
+                  key={key}
+                  href={settings[key]}
+                  aria-label={name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icon name={name.toLowerCase()} size={19} />
+                </a>
+              ) : null
+            )}
           </div>
         </div>
       </div>
 
       <div className="footer-bottom">
-        <div className="footer-bottom-inner">© 2026 ТОО «СХМ Агро». Прототип интерфейса.</div>
+        {/* Год берём текущий, чтобы подвал не устарел первого января. */}
+        <div className="footer-bottom-inner">
+          <span>© {new Date().getFullYear()} ТОО «СХМ Агро». Все права защищены.</span>
+          <Link to="/privacy">Политика конфиденциальности</Link>
+        </div>
       </div>
     </footer>
   )

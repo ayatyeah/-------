@@ -809,6 +809,16 @@ function SettingsTab() {
           {field('subsidy_url', 'ГосАгро (субсидии)')}
         </div>
 
+        <div className="admin-settings-panel">
+          <h3>Соцсети</h3>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Пустое поле — значок не показывается в подвале.
+          </p>
+          {field('instagram_url', 'Instagram')}
+          {field('telegram_url', 'Telegram')}
+          {field('whatsapp_url', 'WhatsApp')}
+        </div>
+
         <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
           <h3>Тексты главной</h3>
           {field('hero_title', 'Заголовок героя')}

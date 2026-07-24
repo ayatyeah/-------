@@ -399,6 +399,71 @@ app.put('/api/settings', requireAdmin, wrap((req, res) => {
   res.json(store.settings.update(req.body || {}))
 }))
 
+/* --------------------------- robots и sitemap ---------------------------- */
+
+/* Раньше это были статические файлы в public/, и оба были нерабочими:
+   в карте сайта стояло пространство имён sitemap.org вместо sitemaps.org
+   и относительные адреса вида <loc>/catalog</loc>. Спецификация требует
+   абсолютных — поисковики такую карту отвергают целиком.
+
+   Адрес сайта заранее неизвестен (сегодня IP, завтра домен), поэтому
+   собираем его из самого запроса. За обратным прокси req.protocol читает
+   X-Forwarded-Proto — работает и по http, и по https. */
+const siteOrigin = (req) => `${req.protocol}://${req.get('host')}`
+
+app.get('/robots.txt', wrap((req, res) => {
+  res.type('text/plain').send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      '',
+      '# Админка и API в поиске не нужны',
+      'Disallow: /admin',
+      'Disallow: /api/',
+      '',
+      `Sitemap: ${siteOrigin(req)}/sitemap.xml`,
+      '',
+    ].join('\n')
+  )
+}))
+
+app.get('/sitemap.xml', wrap((req, res) => {
+  const origin = siteOrigin(req)
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const pages = [
+    { loc: '/', priority: '1.0', freq: 'weekly' },
+    { loc: '/catalog', priority: '0.9', freq: 'weekly' },
+    { loc: '/about', priority: '0.7', freq: 'monthly' },
+    { loc: '/news', priority: '0.7', freq: 'weekly' },
+    { loc: '/contacts', priority: '0.6', freq: 'monthly' },
+    { loc: '/privacy', priority: '0.3', freq: 'yearly' },
+    // Карточки техники и статьи берём из данных: каталог пополняется через
+    // админку, и вручную поддерживать список бессмысленно.
+    ...store.models.all().map((m) => ({ loc: `/catalog/${m.id}`, priority: '0.8', freq: 'monthly' })),
+    ...store.news.all().map((n) => ({
+      loc: `/news/${n.id}`,
+      priority: '0.5',
+      freq: 'monthly',
+      lastmod: n.date,
+    })),
+  ]
+
+  const body = pages
+    .map(
+      (p) =>
+        `  <url><loc>${esc(origin + p.loc)}</loc>` +
+        (p.lastmod ? `<lastmod>${esc(p.lastmod)}</lastmod>` : '') +
+        `<changefreq>${p.freq}</changefreq><priority>${p.priority}</priority></url>`
+    )
+    .join('\n')
+
+  res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`
+  )
+}))
+
 /* -------------------------------- здоровье ------------------------------ */
 
 /**

@@ -1557,11 +1557,27 @@ select.input {
 }
 
 .footer-bottom-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
   max-width: var(--wrap);
   margin-inline: auto;
   padding: 20px var(--gutter);
   font-size: 13px;
   color: var(--on-dark-2);
+}
+
+.footer-bottom-inner a {
+  color: var(--on-dark-2);
+  border-bottom: 1px solid var(--rule-dark);
+  transition: color 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.footer-bottom-inner a:hover {
+  color: var(--brass-300);
+  border-color: var(--brass-300);
 }
 
 /* ------------------------- плавающая кнопка звонка ---------------------- */
