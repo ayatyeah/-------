@@ -250,7 +250,7 @@ export const requests = {
     const r = data.requests.find((x) => x.id === id)
     return r ? clone(r) : null
   },
-  create({ type, fio, phone, meta, comment }) {
+  create({ type, fio, phone, meta, comment, consentAt, policyVersion }) {
     const r = {
       id: newId('r'),
       date: today(),
@@ -260,6 +260,12 @@ export const requests = {
       meta: meta || '—',
       comment: comment || '',
       status: 'Новая',
+      /* Доказательство согласия на обработку персональных данных.
+         Хранится точное время и редакция политики, с которой человек
+         согласился: если он потом спросит «на что я подписывался»,
+         ответ должен быть предметным, а не «где-то стояла галочка». */
+      consentAt: consentAt || new Date().toISOString(),
+      policyVersion: policyVersion || '',
     }
     data.requests.unshift(r)
     save()

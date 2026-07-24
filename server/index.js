@@ -135,6 +135,13 @@ const limitAnalyze = rateLimit({
 
 /* ------------------------------- утилиты ------------------------------- */
 
+/* Редакция политики конфиденциальности. Записывается в каждую заявку рядом
+   с временем согласия, чтобы потом было видно, с какой именно версией текста
+   человек согласился.
+   Меняете текст политики — поднимите дату и здесь, и в src/pages/Privacy.jsx
+   (константа PRIVACY_VERSION там же). */
+const PRIVACY_VERSION = '2026-07-24'
+
 /** Обрезает строку по длине и убирает управляющие символы. */
 const clean = (v, max) =>
   typeof v === 'string' ? v.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, max) : ''
@@ -341,13 +348,30 @@ app.post('/api/requests', limitRequests, wrap((req, res) => {
 
   if (!fio || !phone) return res.status(400).json({ error: 'Укажите имя и телефон' })
 
+  /* Согласие проверяем на сервере, а не только галочкой в форме: галочку
+     легко обойти запросом мимо интерфейса, а хранить персональные данные
+     без согласия нельзя. Нет согласия — нет заявки. */
+  if (req.body?.consent !== true) {
+    return res.status(400).json({ error: 'Нужно согласие на обработку персональных данных' })
+  }
+
   let metaText = clean(meta, 200) || '—'
   if (type === 'КП') {
     const m = modelId ? store.models.get(modelId) : null
     metaText = `${m ? m.name : 'Общая заявка'} · ${clean(region, 60) || '—'}`
   }
 
-  res.status(201).json(store.requests.create({ type, fio, phone, meta: metaText, comment }))
+  res.status(201).json(
+    store.requests.create({
+      type,
+      fio,
+      phone,
+      meta: metaText,
+      comment,
+      consentAt: new Date().toISOString(),
+      policyVersion: PRIVACY_VERSION,
+    })
+  )
 }))
 
 app.patch('/api/requests/:id', requireAdmin, wrap((req, res) => {

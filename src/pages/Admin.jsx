@@ -592,6 +592,19 @@ function LeadAnalyzer({ requests, byId, setById }) {
   )
 }
 
+/** «2026-07-24T09:15:00.000Z» → «24.07.2026, 15:15» — время согласия. */
+function formatConsent(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const prioClass = (p) => (p === 'Горячий' ? 'hot' : p === 'Тёплый' ? 'warm' : 'cold')
 const prioTag = (p) =>
   p === 'Горячий' ? 'tag-brass' : p === 'Тёплый' ? 'tag-green' : 'tag-muted'
@@ -663,7 +676,17 @@ function RequestsTab({ requests, reload }) {
                       {r.type}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 500 }}>{r.fio}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    {r.fio}
+                    {/* Доказательство согласия на обработку данных: когда его
+                        дали и с какой редакцией политики. Если человек
+                        спросит «на что я подписывался» — ответ здесь. */}
+                    {r.consentAt && (
+                      <div className="consent-mark" title={`Редакция политики: ${r.policyVersion || '—'}`}>
+                        согласие {formatConsent(r.consentAt)}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <a
                       href={`tel:${r.phone.replace(/\s/g, '')}`}

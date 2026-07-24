@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import Icon from './Icon'
 
 /**
  * ИИ-ассистент в углу экрана.
  *
- * Отвечает Gemini (или OpenAI как резерв). Если ключей нет или провайдеры
+ * Отвечает OpenAI (или Gemini как резерв). Если ключей нет или провайдеры
  * недоступны, сервер отвечает по правилам — интерфейс тот же, здесь ничего
  * менять не нужно. В шапке честно пишем, кто отвечает.
  */
@@ -161,6 +162,15 @@ export default function AiChat() {
               →
             </button>
           </form>
+
+          {/* Переписку обрабатывает сторонний ИИ-сервис — человек должен знать
+              об этом до того, как что-то напишет, а не из политики постфактум. */}
+          <div className="ai-note">
+            Отвечает ИИ — не вводите личные данные.{' '}
+            <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+              Подробнее
+            </Link>
+          </div>
         </div>
       )}
     </>

@@ -15,6 +15,7 @@ import ModelPage from './pages/ModelPage'
 import News from './pages/News'
 import Article from './pages/Article'
 import Contacts from './pages/Contacts'
+import Privacy from './pages/Privacy'
 
 // Админку грузим отдельным чанком: посетителям сайта она не нужна,
 // а весит она больше любой публичной страницы.
@@ -68,6 +69,7 @@ function Shell() {
         <Route path="/news" element={<News />} />
         <Route path="/news/:id" element={<Article />} />
         <Route path="/contacts" element={<Contacts />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route
           path="/admin"
           element={

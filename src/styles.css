@@ -2271,6 +2271,93 @@ select.input {
   color: var(--text-2);
 }
 
+/* --------------------- согласие на обработку данных --------------------- */
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.consent input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  accent-color: var(--green-600);
+  cursor: pointer;
+}
+
+.consent a {
+  color: var(--green-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.consent a:hover {
+  color: var(--brass-600);
+}
+
+/* ------------------------------- документы ------------------------------ */
+
+/* Юридический текст: узкая колонка, крупный интерлиньяж — его читают
+   подряд, а не сканируют. */
+.doc {
+  max-width: 760px;
+}
+
+.doc-meta {
+  font-size: 14px;
+  color: var(--text-3);
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.doc-section {
+  margin-top: 34px;
+}
+
+.doc-section h2 {
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+
+.doc-section p,
+.doc-section li {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.doc-section p + p,
+.doc-section ul + p {
+  margin-top: 12px;
+}
+
+.doc-section ul {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.doc-section li + li {
+  margin-top: 8px;
+}
+
+.doc-section b {
+  color: var(--text);
+}
+
+.doc-back {
+  margin-top: 44px;
+  padding-top: 26px;
+  border-top: 1px solid var(--rule);
+}
+
 /* ------------------------------- врезка-цитата -------------------------- */
 
 .pullquote {
@@ -2655,6 +2742,24 @@ select.input {
   flex: none;
 }
 
+/* Предупреждение, что переписку читает сторонний ИИ-сервис. Тихое, но
+   постоянно на виду: человек должен знать это до того, как напишет. */
+.ai-note {
+  flex: none;
+  padding: 0 12px 10px;
+  background: var(--surface);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.ai-note a {
+  color: var(--green-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .ai-input {
   flex: 1;
   padding: 10px 12px;
@@ -2765,6 +2870,16 @@ select.input {
   flex-direction: column;
   gap: 9px;
   margin-top: 14px;
+}
+
+/* Отметка о согласии на обработку данных в строке заявки. */
+.consent-mark {
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-3);
+  white-space: nowrap;
+  cursor: help;
 }
 
 /* Пометка у заявки, которую ИИ пропустил и посчитали правилами. */

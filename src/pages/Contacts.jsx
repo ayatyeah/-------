@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
+import { ConsentCheck } from '../components/ui'
 
 export default function Contacts() {
   const { settings, showToast, openCall } = useSite()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const [consent, setConsent] = useState(false)
   const telHref = `tel:${settings.phone.replace(/[^\d+]/g, '')}`
 
   async function submit(e) {
@@ -21,8 +23,10 @@ export default function Contacts() {
         phone: f.c_phone.value.trim(),
         comment: f.c_msg.value.trim(),
         meta: 'Обратная связь',
+        consent: true,
       })
       f.reset()
+      setConsent(false) // форма очищена — согласие тоже сбрасываем
       showToast('Сообщение отправлено. Спасибо!')
     } catch (err) {
       setError(err.message)
@@ -109,7 +113,12 @@ export default function Contacts() {
                   placeholder="Что вас интересует"
                 />
               </div>
-              <button type="submit" className="btn btn-primary btn-block" disabled={sending}>
+              <ConsentCheck id="c_consent" checked={consent} onChange={setConsent} />
+              <button
+                type="submit"
+                className="btn btn-primary btn-block"
+                disabled={sending || !consent}
+              >
                 {sending ? 'Отправляем…' : 'Отправить'}
               </button>
             </form>

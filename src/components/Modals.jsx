@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
-import { Dialog } from './ui'
+import { ConsentCheck, Dialog } from './ui'
 
 /** Заявка на КП: имя, телефон, регион, комментарий. */
 function KPDialog() {
@@ -9,6 +9,7 @@ function KPDialog() {
   const [regions, setRegions] = useState([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const [consent, setConsent] = useState(false)
 
   useEffect(() => {
     api.regions().then(setRegions).catch(() => setRegions([]))
@@ -27,6 +28,7 @@ function KPDialog() {
         region: f.k_region.value,
         comment: f.k_comment.value.trim(),
         modelId: modal.modelId,
+        consent: true,
       })
       closeModal()
       showToast('Заявка на КП отправлена. Мы свяжемся с вами.')
@@ -71,11 +73,12 @@ function KPDialog() {
             placeholder="Комплектация, количество, сроки"
           />
         </div>
+        <ConsentCheck id="k_consent" checked={consent} onChange={setConsent} />
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={closeModal}>
             Отмена
           </button>
-          <button type="submit" className="btn btn-primary" disabled={sending}>
+          <button type="submit" className="btn btn-primary" disabled={sending || !consent}>
             {sending ? 'Отправляем…' : 'Отправить заявку'}
           </button>
         </div>
@@ -89,6 +92,7 @@ function CallDialog() {
   const { closeModal, showToast } = useSite()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+  const [consent, setConsent] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -100,6 +104,7 @@ function CallDialog() {
         type: 'Звонок',
         fio: f.cb_name.value.trim(),
         phone: f.cb_phone.value.trim(),
+        consent: true,
       })
       closeModal()
       showToast('Заявка на звонок принята. Скоро перезвоним.')
@@ -125,11 +130,12 @@ function CallDialog() {
           <label htmlFor="cb_phone">Телефон *</label>
           <input id="cb_phone" className="input" name="cb_phone" required placeholder="+7 ___ ___ __ __" />
         </div>
+        <ConsentCheck id="cb_consent" checked={consent} onChange={setConsent} />
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={closeModal}>
             Отмена
           </button>
-          <button type="submit" className="btn btn-primary" disabled={sending}>
+          <button type="submit" className="btn btn-primary" disabled={sending || !consent}>
             {sending ? 'Отправляем…' : 'Жду звонка'}
           </button>
         </div>

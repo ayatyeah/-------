@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 
 /** Плашка вместо фотографии — штриховка с подписью. */
 export function MediaStub({ label }) {
@@ -75,6 +76,38 @@ export function EmptyState({ title, text }) {
       <div className="state-title">{title}</div>
       {text && <p>{text}</p>}
     </div>
+  )
+}
+
+/**
+ * Согласие на обработку персональных данных — обязательное перед отправкой
+ * любой формы с именем и телефоном.
+ *
+ * Один компонент на все три формы: текст согласия должен быть везде одним и
+ * тем же, иначе непонятно, с чем именно человек согласился.
+ *
+ * Галочка намеренно не отмечена по умолчанию: заранее проставленная — это уже
+ * не согласие. Сервер тоже проверяет его отдельно, мимо интерфейса заявку без
+ * согласия не создать.
+ */
+export function ConsentCheck({ checked, onChange, id }) {
+  return (
+    <label className="consent" htmlFor={id}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        required
+      />
+      <span>
+        Я согласен на обработку моих персональных данных и ознакомлен с{' '}
+        <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+          политикой конфиденциальности
+        </Link>
+        .
+      </span>
+    </label>
   )
 }
 
