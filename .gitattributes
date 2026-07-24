@@ -1,0 +1,23 @@
+# Переводы строк.
+#
+# Проект разрабатывается на Windows, а запускается в Linux-контейнере.
+# Без этих правил git отдавал бы shell-скриптам виндовые переводы строк
+# (CRLF), и внутри контейнера они падали бы с невнятным «\r: not found» —
+# ошибка выглядит как что угодно, только не как своя причина.
+
+# По умолчанию git сам решает, что текст, и нормализует в репозитории.
+* text=auto
+
+# Всё, что исполняется или читается Linux-ом, — строго с LF.
+*.sh text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.env.example text eol=lf
+
+# Двоичные файлы не трогаем.
+*.png binary
+*.webp binary
+*.woff2 binary
+*.ico binary

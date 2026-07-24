@@ -1,0 +1,164 @@
+# ============================================================================
+#  Боевой запуск на сервере (DigitalOcean droplet и любой другой Linux).
+#
+#  Обычный запуск (сайт на 80 порту, без шифрования):
+#      docker compose up -d --build
+#
+#  Запуск с HTTPS (нужен домен, смотрящий на этот сервер).
+#  В .env добавьте WEB_BIND=127.0.0.1:3001 — иначе сайт и Caddy подерутся
+#  за 80 порт, — затем:
+#      DOMAIN=shmagro.kz EMAIL=info@shmagro.kz docker compose --profile tls up -d --build
+#
+#  Без HTTPS пароль администратора идёт по сети открытым текстом. Для показа
+#  заказчику это терпимо, для настоящей работы — нет.
+# ============================================================================
+
+services:
+  # ---------------------------------- сайт ---------------------------------
+  web:
+    build: .
+    image: shm-agro:latest
+
+    # Автоподъём. unless-stopped поднимает контейнер после падения процесса
+    # и после перезагрузки сервера, но уважает ручную остановку: если вы
+    # сами сделали docker compose stop, сам он не вернётся.
+    restart: unless-stopped
+
+    # Внутрь ставится крошечный init-процесс. Без него Node оказывается
+    # первым процессом контейнера и не реагирует на сигнал остановки —
+    # каждая остановка и перезапуск ждали бы таймаута в 10 секунд.
+    init: true
+
+    # По умолчанию сайт торчит наружу на 80 порту.
+    # В режиме HTTPS порт 80 занимает Caddy, поэтому там в .env ставят
+    #     WEB_BIND=127.0.0.1:3001
+    # и сайт становится доступен только изнутри сервера — снаружи к нему
+    # ходит Caddy по внутренней сети. Без этого оба сервиса дрались бы
+    # за 80 порт и запуск падал.
+    ports:
+      - '${WEB_BIND:-0.0.0.0:80}:3001'
+
+    environment:
+      PORT: 3001
+      HOST: 0.0.0.0
+      NODE_ENV: production
+      STORE_PATH: /data/store.json
+
+    # Пароль администратора, ключи ИИ и секрет сессий берутся отсюда.
+    # Файл .env лежит рядом с этим файлом на сервере и в git не хранится.
+    env_file:
+      - .env
+
+    volumes:
+      # Данные сайта переживают пересборку образа и перезапуск.
+      - shm-data:/data
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  # --------------------------------- бэкапы --------------------------------
+  # Раз в сутки складывает копию данных в папку ./backups на самом сервере.
+  backup:
+    image: alpine:3.20
+    restart: unless-stopped
+    init: true
+
+    environment:
+      STORE_PATH: /data/store.json
+      BACKUP_DIR: /backups
+      # Сколько дней хранить копии. Старше — удаляются.
+      BACKUP_KEEP_DAYS: 14
+      # Период в секундах: 86400 = раз в сутки.
+      BACKUP_EVERY: 86400
+
+    volumes:
+      # Данные — только на чтение: бэкап не должен ничего им сделать.
+      - shm-data:/data:ro
+      # Копии кладём в папку рядом с проектом, чтобы их было видно на
+      # сервере обычным ls и легко забрать через scp.
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+
+    # Ждём, пока сайт поднимется и создаст файл данных. Без этого бэкап
+    # стартовал одновременно с сайтом, не находил store.json и пропускал
+    # первую копию.
+    depends_on:
+      web:
+        condition: service_healthy
+
+    # Первая копия делается сразу при запуске, дальше — раз в сутки.
+    command: ['sh', '/scripts/backup-loop.sh']
+
+    logging:
+      driver: json-file
+      options:
+        max-size: '5m'
+        max-file: '3'
+
+  # ------------------------ восстановление из копии -------------------------
+  # Сам не запускается: включается только вручную, когда данные нужно вернуть.
+  #
+  #     docker compose stop web
+  #     docker compose run --rm restore
+  #     docker compose start web
+  #
+  # Сайт обязательно остановить: он держит данные в памяти и, продолжая
+  # работать, перезапишет восстановленный файл.
+  #
+  # Это отдельный сервис, а не команда в backup, потому что там данные
+  # примонтированы только на чтение — восстановление в нём падало с
+  # «Read-only file system».
+  restore:
+    image: alpine:3.20
+    profiles: ['tools']
+    environment:
+      STORE_PATH: /data/store.json
+      BACKUP_DIR: /backups
+    volumes:
+      - shm-data:/data # на запись: сюда возвращаем данные
+      - ./backups:/backups:ro # копии только читаем, портить их нечем
+      - ./scripts:/scripts:ro
+    command: ['sh', '/scripts/restore.sh']
+
+  # ---------------------------- HTTPS (по желанию) --------------------------
+  # Включается профилем: docker compose --profile tls up -d
+  # Caddy сам получает и продлевает сертификат Let's Encrypt.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ['tls']
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # Значения по умолчанию обязательны, даже если сервис выключен профилем:
+      # docker compose подставляет переменные во весь файл ДО того, как
+      # применит профили. С обязательной переменной (:?) обычный запуск без
+      # HTTPS падал бы с требованием указать домен.
+      DOMAIN: ${DOMAIN:-localhost}
+      EMAIL: ${EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+volumes:
+  shm-data:
+  caddy-data:
+  caddy-config:
