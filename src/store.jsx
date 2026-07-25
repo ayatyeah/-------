@@ -9,6 +9,8 @@ const FALLBACK = {
   email: 'info@shmagro.kz',
   address: 'г. Астана, Индустриальная зона, ул. Заводская 7',
   hours: 'Пн–Пт 8:00–18:00, Сб 9:00–14:00',
+  legal_name: '',
+  bin: '',
   leasing_url: 'https://kazagro.kz',
   subsidy_url: 'https://qoldau.kz',
   hero_title: 'Сельхозтехника, сделанная для степи',

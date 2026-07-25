@@ -438,6 +438,7 @@ app.get('/sitemap.xml', wrap((req, res) => {
     { loc: '/news', priority: '0.7', freq: 'weekly' },
     { loc: '/contacts', priority: '0.6', freq: 'monthly' },
     { loc: '/privacy', priority: '0.3', freq: 'yearly' },
+    { loc: '/terms', priority: '0.3', freq: 'yearly' },
     // Карточки техники и статьи берём из данных: каталог пополняется через
     // админку, и вручную поддерживать список бессмысленно.
     ...store.models.all().map((m) => ({ loc: `/catalog/${m.id}`, priority: '0.8', freq: 'monthly' })),

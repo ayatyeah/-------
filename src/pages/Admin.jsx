@@ -804,6 +804,16 @@ function SettingsTab() {
         </div>
 
         <div className="admin-settings-panel">
+          <h3>Юридические реквизиты</h3>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Показываются в подвале, контактах и политике. Пустое поле — строка
+            не отображается.
+          </p>
+          {field('legal_name', 'Полное наименование (ТОО «…»)')}
+          {field('bin', 'БИН')}
+        </div>
+
+        <div className="admin-settings-panel">
           <h3>Внешние ссылки</h3>
           {field('leasing_url', 'КазАгроФинанс (лизинг)')}
           {field('subsidy_url', 'ГосАгро (субсидии)')}

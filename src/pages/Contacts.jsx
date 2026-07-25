@@ -36,11 +36,15 @@ export default function Contacts() {
   }
 
   const rows = [
+    // Реквизиты — первыми и только когда заполнены: по закону о защите прав
+    // потребителей продавец должен быть назван.
+    settings.legal_name && { k: 'Наименование', v: settings.legal_name },
+    settings.bin && { k: 'БИН', v: settings.bin },
     { k: 'Адрес', v: settings.address },
     { k: 'Телефон', v: <a href={telHref}>{settings.phone}</a> },
     { k: 'E-mail', v: <a href={`mailto:${settings.email}`}>{settings.email}</a> },
     { k: 'Часы работы', v: settings.hours },
-  ]
+  ].filter(Boolean)
 
   return (
     <main className="route-fade">

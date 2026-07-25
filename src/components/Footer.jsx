@@ -21,6 +21,14 @@ export default function Footer() {
             ТОО СХМ Агро
           </div>
           <p>Производство и продажа сельхозтехники. {settings.address}.</p>
+          {/* Реквизиты появляются, только когда заполнены в админке. */}
+          {(settings.legal_name || settings.bin) && (
+            <p className="footer-legal">
+              {settings.legal_name}
+              {settings.legal_name && settings.bin ? ', ' : ''}
+              {settings.bin ? `БИН ${settings.bin}` : ''}
+            </p>
+          )}
         </div>
 
         <div>
@@ -75,8 +83,11 @@ export default function Footer() {
       <div className="footer-bottom">
         {/* Год берём текущий, чтобы подвал не устарел первого января. */}
         <div className="footer-bottom-inner">
-          <span>© {new Date().getFullYear()} ТОО «СХМ Агро». Все права защищены.</span>
-          <Link to="/privacy">Политика конфиденциальности</Link>
+          <span>© {new Date().getFullYear()} {settings.legal_name || 'ТОО «СХМ Агро»'}. Все права защищены.</span>
+          <div className="footer-bottom-links">
+            <Link to="/privacy">Политика конфиденциальности</Link>
+            <Link to="/terms">Условия использования</Link>
+          </div>
         </div>
       </div>
     </footer>

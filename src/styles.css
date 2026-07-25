@@ -1498,6 +1498,14 @@ select.input {
   max-width: 34ch;
 }
 
+/* Юридические реквизиты в подвале — тише основного текста. */
+.footer-legal {
+  margin-top: 8px;
+  font-size: 13px !important;
+  color: var(--on-dark-2);
+  opacity: 0.8;
+}
+
 .footer-col-title {
   font-family: var(--font-head);
   font-weight: 600;
@@ -1567,6 +1575,12 @@ select.input {
   padding: 20px var(--gutter);
   font-size: 13px;
   color: var(--on-dark-2);
+}
+
+.footer-bottom-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
 }
 
 .footer-bottom-inner a {
@@ -2285,6 +2299,91 @@ select.input {
   font-size: 15.5px;
   line-height: 1.6;
   color: var(--text-2);
+}
+
+/* ------------------------- баннер про cookie ---------------------------- */
+
+/* Лента внизу экрана. Слева от плавающих кнопок (чат/звонок), чтобы их не
+   перекрывать: у стопки z-index 45, здесь выше, но по ширине баннер её не
+   достаёт за счёт правого отступа на широких экранах. */
+.cookie {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  padding: 14px var(--gutter);
+  background: var(--green-900);
+  border-top: 1px solid var(--rule-dark);
+  box-shadow: 0 -8px 30px rgba(20, 37, 26, 0.25);
+  animation: cookie-up 0.4s var(--ease);
+}
+
+@keyframes cookie-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.cookie-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  /* Справа оставляем место под плавающие кнопки, чтобы не налезали. */
+  padding-right: 210px;
+}
+
+.cookie-text {
+  flex: 1;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--on-dark-2);
+}
+
+.cookie-text b {
+  color: var(--on-dark);
+}
+
+.cookie-text a {
+  color: var(--brass-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cookie-actions {
+  display: flex;
+  gap: 10px;
+  flex: none;
+}
+
+.cookie .btn-ghost {
+  color: var(--on-dark-2);
+  border-color: var(--rule-dark);
+}
+
+.cookie .btn-ghost:hover {
+  color: var(--on-dark);
+  border-color: var(--brass-300);
+}
+
+@media (max-width: 900px) {
+  .cookie-inner {
+    /* На узких экранах плавающие кнопки прячутся при прокрутке, и место под
+       них резервировать незачем — текст и кнопки в столбик. */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding-right: 0;
+  }
+
+  .cookie-actions {
+    justify-content: flex-end;
+  }
 }
 
 /* --------------------- согласие на обработку данных --------------------- */

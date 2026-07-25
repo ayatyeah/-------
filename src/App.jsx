@@ -16,6 +16,8 @@ import News from './pages/News'
 import Article from './pages/Article'
 import Contacts from './pages/Contacts'
 import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import CookieConsent from './components/CookieConsent'
 
 // Админку грузим отдельным чанком: посетителям сайта она не нужна,
 // а весит она больше любой публичной страницы.
@@ -70,6 +72,7 @@ function Shell() {
         <Route path="/news/:id" element={<Article />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route
           path="/admin"
           element={
@@ -110,6 +113,9 @@ function Shell() {
 
       <Modals />
       <Toast />
+      {/* В админке баннер не нужен: это рабочий инструмент сотрудника,
+          а не публичная страница. */}
+      {!isAdmin && <CookieConsent />}
     </div>
   )
 }
