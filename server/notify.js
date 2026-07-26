@@ -1,0 +1,58 @@
+/**
+ * Уведомление о новой заявке в Telegram.
+ *
+ * Зачем: заявка попадает в store.json, но пока никто не откроет админку,
+ * о ней никто не знает. Для сайта, который собирает лиды, это главная
+ * операционная дыра — клиент ждёт звонка, а заявку никто не видел.
+ *
+ * Telegram выбран намеренно: обычный HTTPS-запрос через fetch, без SMTP,
+ * без библиотек, без аккаунтов у почтовых сервисов. Настройка — две
+ * переменные в .env (как их получить, написано в .env.example).
+ *
+ * Важно про закон: сами персональные данные остаются в базе на сервере в
+ * РК. В Telegram уходит только сигнал «пришла заявка» с минимумом для
+ * связи — этого достаточно, чтобы менеджер открыл админку и перезвонил.
+ */
+
+const token = () => process.env.TELEGRAM_BOT_TOKEN || ''
+const chatId = () => process.env.TELEGRAM_CHAT_ID || ''
+
+export const notifyEnabled = () => !!token() && !!chatId()
+
+/**
+ * Шлёт сообщение о заявке. Никогда не бросает исключение: сбой Telegram не
+ * должен мешать приёму заявки — она уже сохранена. Ошибку только логируем.
+ */
+export async function notifyNewRequest(r) {
+  if (!notifyEnabled()) return
+
+  const lines = [
+    '🔔 Новая заявка на сайте',
+    '',
+    `Тип: ${r.type}`,
+    `Имя: ${r.fio}`,
+    `Телефон: ${r.phone}`,
+    r.meta && r.meta !== '—' ? `Детали: ${r.meta}` : '',
+    r.comment ? `Комментарий: ${r.comment}` : '',
+    '',
+    'Открыть админку и перезвонить.',
+  ].filter(Boolean)
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token()}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId(),
+        text: lines.join('\n'),
+        disable_web_page_preview: true,
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) {
+      console.warn('Telegram не принял уведомление:', res.status, (await res.text()).slice(0, 120))
+    }
+  } catch (e) {
+    console.warn('Не удалось отправить уведомление в Telegram:', e.message?.slice(0, 100))
+  }
+}

@@ -26,7 +26,11 @@
       property="og:description"
       content="Тракторы, комбайны и посевные комплексы собственной сборки. Гарантия 2 года, запчасти на складе, сервис рядом с вашим полем."
     />
-    <meta property="og:image" content="/assets/hero-field.webp" />
+    <!-- Абсолютный адрес: соцсети не показывают превью с относительной
+         картинкой. %VITE_SITE_URL% подставляется при сборке из SITE_URL;
+         пустой (локальная сборка) — остаётся относительный путь, как было. -->
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/assets/hero-field.webp" />
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- Шрифты свои: ни одного запроса на сторонний домен.
@@ -55,23 +59,18 @@
       fetchpriority="high"
     />
 
-    <!-- Карточка организации для поиска -->
+    <!-- Карточка организации для поиска.
+         Контакты (телефон/почта/адрес) здесь НЕ дублируем: они редактируются
+         в админке, а зашитые в HTML молча разошлись бы с настоящими. Источник
+         правды один — настройки сайта; их поисковик берёт со страницы контактов. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "Organization",
         "name": "ТОО «СХМ Агро»",
         "description": "Производство, продажа и сервис сельскохозяйственной техники в Казахстане.",
-        "logo": "/assets/logo.png",
-        "telephone": "+7 7172 55-00-00",
-        "email": "info@shmagro.kz",
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "Индустриальная зона, ул. Заводская 7",
-          "addressLocality": "Астана",
-          "addressCountry": "KZ"
-        },
-        "openingHours": ["Mo-Fr 08:00-18:00", "Sa 09:00-14:00"]
+        "logo": "%VITE_SITE_URL%/assets/logo.png",
+        "url": "%VITE_SITE_URL%/"
       }
     </script>
   </head>

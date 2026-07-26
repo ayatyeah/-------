@@ -3,8 +3,14 @@ import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import Reveal, { CountUp } from '../components/Reveal'
 import Production from '../components/Production'
+import usePageMeta from '../hooks/usePageMeta'
 
 export default function About() {
+  usePageMeta({
+    title: 'О компании',
+    description:
+      'Собственное производство сельхозтехники в Казахстане: льём узлы, собираем, красим и обкатываем на своём полигоне.',
+  })
   // Показатели и сертификаты уже загружены провайдером — второй запрос не нужен.
   const { settings, home, openCall } = useSite()
   const tiltRef = useTilt(8)

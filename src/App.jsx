@@ -18,12 +18,14 @@ import Contacts from './pages/Contacts'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import CookieConsent from './components/CookieConsent'
+import usePageMeta from './hooks/usePageMeta'
 
 // Админку грузим отдельным чанком: посетителям сайта она не нужна,
 // а весит она больше любой публичной страницы.
 const Admin = lazy(() => import('./pages/Admin'))
 
 function NotFound() {
+  usePageMeta({ title: 'Страница не найдена', noindex: true })
   return (
     <main className="wrap" style={{ paddingBlock: 100, textAlign: 'center' }}>
       <span className="kicker" style={{ justifyContent: 'center' }}>
@@ -61,9 +63,18 @@ function Shell() {
   return (
     <div className="app">
       <ScrollTop />
+      {/* Ссылка «к содержанию» — первый элемент в табуляции, видна только при
+          фокусе с клавиатуры. Позволяет пропустить навигацию и уйти сразу к
+          контенту (требование доступности). */}
+      {!isAdmin && (
+        <a href="#main" className="skip-link">
+          К содержанию
+        </a>
+      )}
       {!isAdmin && <Navbar />}
 
-      <Routes>
+      <div id="main">
+        <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/catalog" element={<Catalog />} />
@@ -88,7 +99,8 @@ function Shell() {
           }
         />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </div>
 
       {!isAdmin && <Footer />}
 

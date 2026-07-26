@@ -4,11 +4,21 @@ import { api, formatDate } from '../api'
 import { useFetch } from '../store'
 import { Media, ErrorState } from '../components/ui'
 import Reveal from '../components/Reveal'
+import usePageMeta from '../hooks/usePageMeta'
 
 export default function Article() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: a, loading, error, reload } = useFetch(() => api.article(id), [id])
+
+  // Заголовок и описание — из самой статьи; description берём из первого
+  // абзаца, обрезав до разумной длины сниппета.
+  const snippet = Array.isArray(a?.body) ? a.body.find((p) => typeof p === 'string') : ''
+  usePageMeta({
+    title: a ? a.title : 'Новости',
+    description: snippet ? snippet.slice(0, 160) : undefined,
+    noindex: !!error,
+  })
 
   useEffect(() => {
     window.scrollTo(0, 0)

@@ -15,18 +15,24 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as store from './store.js'
 import * as ai from './ai.js'
+import { notifyNewRequest } from './notify.js'
 import { REGIONS } from './seed.js'
 
 const { seeded } = store.load()
 
 const app = express()
 
-/* За прокси (Railway, любой reverse-proxy) настоящий IP клиента лежит в
-   X-Forwarded-For, а req.socket видит только адрес прокси. Без этой строки
-   ограничитель частоты считал бы всех посетителей одним IP: один спамер
-   выбирал бы лимит сразу для всех, а отдельного злоумышленника было бы не
-   отсечь. '1' — доверяем ровно одному прокси (столько их у Railway). */
-app.set('trust proxy', 1)
+/* Доверие заголовку X-Forwarded-For — ТОЛЬКО когда сайт реально стоит за
+   прокси. Это критично для безопасности: если доверять XFF всегда, а
+   приложение открыто напрямую, любой клиент подделает заголовок случайным
+   адресом и обойдёт все лимиты частоты — безлимитный перебор пароля, спам
+   заявками и слив бюджета ИИ через открытый чат.
+
+   Поэтому доверие включает только переменная TRUST_PROXY=1, и ставит её
+   docker compose, где перед приложением всегда стоит Caddy. При прямом
+   запуске (dev, показ по IP) XFF игнорируется и лимиты считаются по
+   настоящему адресу сокета. */
+if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1)
 
 // gzip: JSON-ответы сжимаются в 3–5 раз, а каталог со спеками весит заметно.
 app.use(compression())
@@ -62,7 +68,7 @@ const CSP = [
 ].join('; ')
 
 // Защитные заголовки — без лишних зависимостей.
-const PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT
+const PROD = process.env.NODE_ENV === 'production'
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'DENY')
@@ -152,6 +158,13 @@ const clean = (v, max) =>
  */
 const adminPassword = () => process.env.ADMIN_PASSWORD || store.settings.get('admin_password')
 
+/* На проде вход должен быть закрыт, пока пароль стандартный или пустой:
+   иначе публичный сайт со стандартным «admin» пускает в админку кого угодно.
+   Проверяем именно при попытке входа (а не при старте): падение процесса
+   уронило бы весь сайт и загнало compose в цикл перезапусков — форма заявки
+   и каталог должны работать независимо от того, настроен ли вход. */
+const loginLocked = () => PROD && (!adminPassword() || adminPassword() === 'admin')
+
 /* ─── Сессия админки ────────────────────────────────────────────────────
    Раньше токен был просто sha256('shm-agro:' + пароль): без срока жизни, один
    и тот же при каждом входе, и по сути равный хэшу пароля. Утечка такого
@@ -207,9 +220,15 @@ function verifyToken(token) {
   }
 }
 
-const requireAdmin = (req, res, next) => {
+/** Есть ли у запроса валидный токен админа. Для эндпоинтов, где доступ к
+    неопубликованному разрешён только своим, а публика видит лишь опубликованное. */
+const isAdmin = (req) => {
   const sent = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
-  if (sent && verifyToken(sent)) return next()
+  return !!sent && verifyToken(sent)
+}
+
+const requireAdmin = (req, res, next) => {
+  if (isAdmin(req)) return next()
   res.status(401).json({ error: 'Требуется вход в админку' })
 }
 
@@ -226,6 +245,12 @@ const wrap = (fn) => async (req, res) => {
 /* --------------------------------- auth -------------------------------- */
 
 app.post('/api/login', limitLogin, wrap((req, res) => {
+  // Пока пароль не сменили со стандартного — на проде вход закрыт целиком.
+  if (loginLocked()) {
+    return res.status(503).json({
+      error: 'Вход в админку не настроен. Задайте свой ADMIN_PASSWORD на сервере.',
+    })
+  }
   const password = typeof req.body?.password === 'string' ? req.body.password : ''
   if (password && safeEqual(password, adminPassword())) {
     return res.json({ token: issueToken(), expiresInHours: SESSION_TTL_MS / 3600000 })
@@ -266,7 +291,10 @@ app.put('/api/services/:id', requireAdmin, wrap((req, res) => {
 /* -------------------------------- модели ------------------------------- */
 
 app.get('/api/models', wrap((req, res) => {
-  res.json(store.models.all({ cat: req.query.cat, includeUnpublished: !!req.query.all }))
+  // Черновики (неопубликованные) — только для админа. Публике ?all=1 не даёт
+  // ничего сверх опубликованного, иначе неготовые карточки утекали бы наружу.
+  const includeUnpublished = !!req.query.all && isAdmin(req)
+  res.json(store.models.all({ cat: req.query.cat, includeUnpublished }))
 }))
 
 app.get('/api/models/:id', wrap((req, res) => {
@@ -302,10 +330,11 @@ app.delete('/api/models/:id', requireAdmin, wrap((req, res) => {
 /* -------------------------------- новости ------------------------------ */
 
 app.get('/api/news', wrap((req, res) => {
+  // Черновики статей — только для админа (см. /api/models).
   res.json(
     store.news.all({
       limit: req.query.limit ? Number(req.query.limit) : undefined,
-      includeUnpublished: !!req.query.all,
+      includeUnpublished: !!req.query.all && isAdmin(req),
     })
   )
 }))
@@ -340,13 +369,30 @@ app.get('/api/requests', requireAdmin, wrap((_req, res) => res.json(store.reques
 
 // Публичный: формы КП / звонка / обратной связи. Открыт всему интернету,
 // поэтому здесь и ограничитель частоты, и обрезка полей по длине.
-app.post('/api/requests', limitRequests, wrap((req, res) => {
+app.post('/api/requests', limitRequests, wrap(async (req, res) => {
   const { type, modelId, region, meta } = req.body || {}
   const fio = clean(req.body?.fio, 100)
   const phone = clean(req.body?.phone, 40)
   const comment = clean(req.body?.comment, 1000)
 
+  /* Ловушка для ботов. Поле `website` спрятано от людей (см. формы), человек
+     его не заполняет, а бот заполняет все поля подряд. Отвечаем ложным
+     «успехом»: бот считает, что всё вышло, и не пробует другой способ, а
+     заявка никуда не пишется и никого не будит. */
+  if (clean(req.body?.website, 100)) {
+    return res.status(201).json({ ok: true })
+  }
+
   if (!fio || !phone) return res.status(400).json({ error: 'Укажите имя и телефон' })
+
+  /* Телефон проверяем по числу цифр: 6–15 (диапазон номеров по E.164).
+     Жёсткий шаблон формата не навязываем — он отпугивал бы живых клиентов,
+     которые пишут номер по-своему. Задача проверки — отсечь мусор, а не
+     заставить набрать «правильно». */
+  const digits = (phone.match(/\d/g) || []).length
+  if (digits < 6 || digits > 15) {
+    return res.status(400).json({ error: 'Проверьте номер телефона' })
+  }
 
   /* Согласие проверяем на сервере, а не только галочкой в форме: галочку
      легко обойти запросом мимо интерфейса, а хранить персональные данные
@@ -361,17 +407,23 @@ app.post('/api/requests', limitRequests, wrap((req, res) => {
     metaText = `${m ? m.name : 'Общая заявка'} · ${clean(region, 60) || '—'}`
   }
 
-  res.status(201).json(
-    store.requests.create({
-      type,
-      fio,
-      phone,
-      meta: metaText,
-      comment,
-      consentAt: new Date().toISOString(),
-      policyVersion: PRIVACY_VERSION,
-    })
-  )
+  // Запись синхронная (см. store.requests.create): не записалось — сюда
+  // прилетит исключение, wrap вернёт форме честную 500, ложного «успеха» не
+  // будет.
+  const saved = store.requests.create({
+    type,
+    fio,
+    phone,
+    meta: metaText,
+    comment,
+    consentAt: new Date().toISOString(),
+    policyVersion: PRIVACY_VERSION,
+  })
+
+  // Отвечаем форме сразу — уведомление в Telegram не должно её задерживать и
+  // тем более ронять: заявка уже на диске.
+  res.status(201).json(saved)
+  notifyNewRequest(saved)
 }))
 
 app.patch('/api/requests/:id', requireAdmin, wrap((req, res) => {
@@ -525,12 +577,28 @@ app.get('/api/admin/summary', requireAdmin, wrap((_req, res) => {
  * чтобы прод крутился на одном порту.
  */
 const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist')
+
+/* Маршруты, которые реально существуют в клиенте. Нужны, чтобы отличать
+   настоящую страницу от несуществующей: раньше сервер отдавал index.html с
+   кодом 200 на ЛЮБОЙ адрес (soft-404), и мусорные ссылки попадали в поисковый
+   индекс. Список статических путей + шаблоны карточек с :id.
+   При добавлении нового маршрута в App.jsx — добавить и сюда. */
+const KNOWN_PATHS = new Set(['/', '/about', '/catalog', '/news', '/contacts', '/privacy', '/terms'])
+const KNOWN_PREFIXES = ['/catalog/', '/news/']
+const isKnownRoute = (p) =>
+  KNOWN_PATHS.has(p) || KNOWN_PREFIXES.some((pre) => p.startsWith(pre) && p.length > pre.length)
+
 if (existsSync(DIST)) {
   // Ассеты именованы с хешем — кешируем их надолго.
   app.use('/assets', express.static(join(DIST, 'assets'), { immutable: true, maxAge: '1y' }))
   app.use(express.static(DIST, { maxAge: '1h' }))
-  // SPA: любой не-API маршрут отдаёт index.html.
-  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(DIST, 'index.html')))
+  // SPA: клиент рисует и страницу, и её «не найдено» сам, поэтому отдаём тот
+  // же index.html — но известному маршруту со статусом 200, а неизвестному
+  // с 404, чтобы поисковик не индексировал несуществующие адреса.
+  app.get(/^(?!\/api).*/, (req, res) => {
+    const status = isKnownRoute(req.path) ? 200 : 404
+    res.status(status).sendFile(join(DIST, 'index.html'))
+  })
 }
 
 /**
@@ -575,7 +643,7 @@ function проверитьОкружение() {
   }
 }
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`✓ API СХМ Агро слушает ${HOST}:${PORT}`)
   console.log(`  Данные: ${store.STORE_PATH}${seeded ? ' (создан из начальных)' : ''}`)
   console.log(
@@ -584,3 +652,16 @@ app.listen(PORT, HOST, () => {
   if (existsSync(DIST)) console.log('  Собранный сайт отдаётся с этого же порта')
   проверитьОкружение()
 })
+
+/* Аккуратное завершение. Docker при остановке и деплое шлёт SIGTERM: успеваем
+   дописать отложенный снимок (правки каталога/статусов из 150-мс окна), иначе
+   они потерялись бы. Заявки и так пишутся сразу, но правки админки — нет. */
+function shutdown(signal) {
+  console.log(`\n${signal}: завершаюсь, сохраняю данные…`)
+  store.flush()
+  server.close(() => process.exit(0))
+  // Если соединения висят — не ждём вечно.
+  setTimeout(() => process.exit(0), 5000).unref()
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))

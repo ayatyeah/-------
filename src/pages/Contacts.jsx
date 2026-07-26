@@ -2,9 +2,14 @@ import { useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
-import { ConsentCheck } from '../components/ui'
+import { ConsentCheck, Honeypot } from '../components/ui'
+import usePageMeta from '../hooks/usePageMeta'
 
 export default function Contacts() {
+  usePageMeta({
+    title: 'Контакты',
+    description: 'Адрес, телефон и почта ТОО «СХМ Агро». Оставьте заявку — перезвоним в рабочее время.',
+  })
   const { settings, showToast, openCall } = useSite()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -23,6 +28,7 @@ export default function Contacts() {
         phone: f.c_phone.value.trim(),
         comment: f.c_msg.value.trim(),
         meta: 'Обратная связь',
+        website: f.c_website.value,
         consent: true,
       })
       f.reset()
@@ -104,6 +110,9 @@ export default function Contacts() {
                   id="c_phone"
                   className="input"
                   name="c_phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   required
                   placeholder="+7 ___ ___ __ __"
                 />
@@ -117,6 +126,7 @@ export default function Contacts() {
                   placeholder="Что вас интересует"
                 />
               </div>
+              <Honeypot name="c_website" />
               <ConsentCheck id="c_consent" checked={consent} onChange={setConsent} />
               <button
                 type="submit"

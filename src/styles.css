@@ -822,6 +822,16 @@ h4 {
   font-size: 24px;
 }
 
+/* Заголовок-ссылка в карточке каталога: выглядит как обычный заголовок,
+   но кликабелен и доступен с клавиатуры. */
+.card-title-link {
+  color: inherit;
+}
+
+.card-title-link:hover {
+  color: var(--green-600);
+}
+
 .card-text {
   font-size: 16px;
   color: var(--text-2);
@@ -2384,6 +2394,37 @@ select.input {
   .cookie-actions {
     justify-content: flex-end;
   }
+}
+
+/* Ссылка «к содержанию»: спрятана над экраном, выезжает при фокусе. */
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 12px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--green-800);
+  color: var(--on-dark);
+  border-radius: var(--r-sm);
+  font-family: var(--font-head);
+  font-weight: 600;
+  transition: top 0.16s var(--ease);
+}
+
+.skip-link:focus {
+  top: 12px;
+  outline: 2px solid var(--brass-300);
+}
+
+/* Ловушка для ботов — убрана из потока и с экрана, но остаётся в DOM, чтобы
+   бот её нашёл и заполнил. display:none некоторые боты пропускают, поэтому
+   прячем позиционированием за пределы экрана. */
+.hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 /* --------------------- согласие на обработку данных --------------------- */

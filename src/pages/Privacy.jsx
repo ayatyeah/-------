@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
+import usePageMeta from '../hooks/usePageMeta'
 
 /* Редакция документа. Держится в паре с PRIVACY_VERSION в server/index.js:
    сервер записывает эту дату в каждую заявку рядом с временем согласия,
@@ -18,6 +19,10 @@ const PRIVACY_DATE = '24 июля 2026 года'
  * иначе он превратится в неправду.
  */
 export default function Privacy() {
+  usePageMeta({
+    title: 'Политика конфиденциальности',
+    description: 'Как ТОО «СХМ Агро» обрабатывает персональные данные, оставленные на сайте.',
+  })
   const { settings } = useSite()
 
   return (

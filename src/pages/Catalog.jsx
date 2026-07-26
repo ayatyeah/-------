@@ -1,11 +1,16 @@
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useFetch, useSite } from '../store'
 import { Media, Loading, ErrorState, EmptyState } from '../components/ui'
 import Reveal from '../components/Reveal'
+import usePageMeta from '../hooks/usePageMeta'
 
 export default function Catalog() {
-  const navigate = useNavigate()
+  usePageMeta({
+    title: 'Каталог техники',
+    description:
+      'Тракторы, комбайны, посевная и почвообрабатывающая техника собственного производства. Характеристики, лизинг и субсидии.',
+  })
   const { openKP } = useSite()
   const [params, setParams] = useSearchParams()
   const cat = params.get('cat') || 'all'
@@ -79,27 +84,27 @@ export default function Catalog() {
                     {filtered.map((m, i) => (
                       // key с категорией — при смене фильтра карточки появляются заново
                       <Reveal key={`${cat}-${m.id}`} delay={(i % 2) * 90}>
+                        {/* Карточку целиком ссылкой сделать нельзя — внутри
+                            кнопка «Получить КП». Поэтому ссылки — фото,
+                            название и «Подробнее»: все ведут к модели и
+                            доступны с клавиатуры. */}
                         <article className="card card--link" style={{ height: '100%' }}>
-                          <div
-                            className="card-media"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/catalog/${m.id}`)}
-                          >
+                          <Link to={`/catalog/${m.id}`} className="card-media" aria-label={m.name}>
                             {m.subsidized && <span className="tag tag-brass">Субсидируется</span>}
                             <Media src={m.photo} alt={m.name} stub={m.catName} />
-                          </div>
+                          </Link>
                           <div className="card-body">
                             <span className="card-kicker">{m.catName}</span>
-                            <h3 className="card-title">{m.name}</h3>
+                            <h3 className="card-title">
+                              <Link to={`/catalog/${m.id}`} className="card-title-link">
+                                {m.name}
+                              </Link>
+                            </h3>
                             <p className="card-text">{m.short}</p>
                             <div className="card-actions">
-                              <button
-                                type="button"
-                                className="btn btn-primary btn-sm"
-                                onClick={() => navigate(`/catalog/${m.id}`)}
-                              >
+                              <Link to={`/catalog/${m.id}`} className="btn btn-primary btn-sm">
                                 Подробнее
-                              </button>
+                              </Link>
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"

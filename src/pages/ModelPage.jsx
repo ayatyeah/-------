@@ -5,6 +5,7 @@ import { useFetch, useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media, ErrorState } from '../components/ui'
 import Reveal from '../components/Reveal'
+import usePageMeta from '../hooks/usePageMeta'
 
 const VIEWS = ['Вид 1', 'Вид 2', 'Кабина', 'В работе']
 
@@ -14,6 +15,14 @@ export default function ModelPage() {
   const { settings, openKP, openCall } = useSite()
   const tiltRef = useTilt(7)
   const { data: m, loading, error, reload } = useFetch(() => api.model(id), [id])
+
+  // Пока модель грузится — общий заголовок; загрузилась — её имя и краткое
+  // описание. Ошибка/не найдено закрываем от индексации.
+  usePageMeta({
+    title: m ? m.name : 'Каталог техники',
+    description: m?.short || undefined,
+    noindex: !!error,
+  })
 
   useEffect(() => {
     window.scrollTo(0, 0)

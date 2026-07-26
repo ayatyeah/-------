@@ -5,6 +5,7 @@ import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
 import Icon from '../components/Icon'
+import usePageMeta from '../hooks/usePageMeta'
 
 const TABS = [
   { id: 'summary', name: 'Сводка' },
@@ -43,7 +44,6 @@ function Login({ onDone }) {
       <form className="login frame" onSubmit={submit}>
         <span className="kicker">Панель управления</span>
         <h1 style={{ marginTop: 12 }}>Вход в админку</h1>
-        <p>Пароль по умолчанию: admin</p>
 
         {error && <div className="form-error">{error}</div>}
 
@@ -846,6 +846,7 @@ function SettingsTab() {
 /* ------------------------------- оболочка -------------------------------- */
 
 export default function Admin() {
+  usePageMeta({ title: 'Админка', noindex: true })
   const navigate = useNavigate()
   const [authed, setAuthed] = useState(() => !!getToken())
   const [tab, setTab] = useState('summary')

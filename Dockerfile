@@ -22,6 +22,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# Абсолютный адрес сайта для og:image и JSON-LD (соцсети требуют абсолютный).
+# Приходит из docker compose как build-arg; пустой — остаются относительные пути.
+ARG SITE_URL=
+ENV SITE_URL=$SITE_URL
 RUN npm run build
 
 # ---------------------------- шаг 2: рабочий образ --------------------------

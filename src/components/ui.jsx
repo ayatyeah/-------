@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 
 /** Плашка вместо фотографии — штриховка с подписью. */
@@ -80,6 +80,24 @@ export function EmptyState({ title, text }) {
 }
 
 /**
+ * Ловушка для ботов. Обычному человеку это поле не видно и недоступно с
+ * клавиатуры (скрыто стилем + aria-hidden + tabIndex -1), а бот, который
+ * заполняет все поля подряд, впишет сюда что-нибудь. Сервер, получив
+ * непустое поле-ловушку, отвечает ложным «успехом» и заявку не сохраняет.
+ *
+ * autoComplete="off" — чтобы браузер не подставил сюда сохранённые данные
+ * и не подставил живого человека под ложное срабатывание.
+ */
+export function Honeypot({ name }) {
+  return (
+    <div className="hp" aria-hidden="true">
+      <label htmlFor={name}>Не заполняйте это поле</label>
+      <input id={name} name={name} type="text" tabIndex={-1} autoComplete="off" />
+    </div>
+  )
+}
+
+/**
  * Согласие на обработку персональных данных — обязательное перед отправкой
  * любой формы с именем и телефоном.
  *
@@ -111,22 +129,62 @@ export function ConsentCheck({ checked, onChange, id }) {
   )
 }
 
-/** Модальное окно: закрытие по Esc и клику по подложке, блокировка скролла. */
+/**
+ * Модальное окно: закрытие по Esc и клику по подложке, блокировка скролла.
+ *
+ * Доступность: Tab заперт внутри окна (иначе фокус уходил под подложку к
+ * недоступным элементам), при открытии фокус ставится на первый элемент, при
+ * закрытии — возвращается на тот, что открыл диалог. Без этого клавиатурный
+ * пользователь после закрытия оказывался в начале страницы.
+ */
 export function Dialog({ title, onClose, children, wide = false }) {
+  const ref = useRef(null)
+
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
+    const opener = document.activeElement // на него вернём фокус при закрытии
+    const box = ref.current
+
+    const focusable = () =>
+      [
+        ...box.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ),
+      ].filter((el) => el.offsetParent !== null)
+
+    // Фокус внутрь — на первый элемент.
+    focusable()[0]?.focus()
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') return onClose()
+      if (e.key !== 'Tab') return
+      const items = focusable()
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      // Замыкаем кольцо: Shift+Tab с первого → на последний и наоборот.
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
+      if (opener instanceof HTMLElement) opener.focus()
     }
   }, [onClose])
 
   return (
     <div className="backdrop" onClick={onClose}>
       <div
+        ref={ref}
         className="dialog"
         style={wide ? { maxWidth: 620 } : undefined}
         role="dialog"

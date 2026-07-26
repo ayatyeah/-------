@@ -1,11 +1,15 @@
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api, formatDate } from '../api'
 import { useFetch } from '../store'
 import { Media, Loading, ErrorState, EmptyState } from '../components/ui'
 import Reveal from '../components/Reveal'
+import usePageMeta from '../hooks/usePageMeta'
 
 export default function News() {
-  const navigate = useNavigate()
+  usePageMeta({
+    title: 'Новости и статьи',
+    description: 'Новости производства, обновления модельного ряда и разборы по субсидиям и лизингу.',
+  })
   const { data, loading, error, reload } = useFetch(() => api.news(), [])
   const items = data ?? []
 
@@ -31,11 +35,9 @@ export default function News() {
           <div className="grid-3">
             {items.map((n, i) => (
               <Reveal key={n.id} delay={(i % 3) * 110}>
-                <article
-                  className="card card--link"
-                  style={{ height: '100%' }}
-                  onClick={() => navigate(`/news/${n.id}`)}
-                >
+                {/* Карточка — настоящая ссылка: доступна с клавиатуры и видна
+                    поисковику. Раньше открывалась только onClick. */}
+                <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
                     <Media src={n.cover} alt={n.title} stub="Обложка" />
                   </div>
@@ -47,7 +49,7 @@ export default function News() {
                       Читать →
                     </span>
                   </div>
-                </article>
+                </Link>
               </Reveal>
             ))}
           </div>

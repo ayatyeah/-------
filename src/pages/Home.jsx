@@ -14,6 +14,7 @@ import WhatWeDo from '../components/WhatWeDo'
 import Production from '../components/Production'
 import { api } from '../api'
 import { useFetch } from '../store'
+import usePageMeta from '../hooks/usePageMeta'
 
 const TRUST = [
   { icon: 'shield', t: 'Гарантия 2 года' },
@@ -60,6 +61,11 @@ function CertLightbox({ cert, onClose }) {
 }
 
 export default function Home() {
+  usePageMeta({
+    title: 'Сельхозтехника, сделанная для степи',
+    description:
+      'Производство, продажа и сервис сельхозтехники в Казахстане: тракторы, комбайны, посевные комплексы. Гарантия 2 года, лизинг и субсидии.',
+  })
   // Все данные главной приходят одним запросом /api/home из провайдера.
   const { settings, home, openKP } = useSite()
   const navigate = useNavigate()
@@ -301,11 +307,7 @@ export default function Home() {
           <div className="grid-3">
             {news.map((n, i) => (
               <Reveal key={n.id} delay={i * 110}>
-                <article
-                  className="card card--link"
-                  style={{ height: '100%' }}
-                  onClick={() => navigate(`/news/${n.id}`)}
-                >
+                <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
                     <Media src={n.cover} alt={n.title} stub="Обложка" />
                   </div>
@@ -317,7 +319,7 @@ export default function Home() {
                       Читать →
                     </span>
                   </div>
-                </article>
+                </Link>
               </Reveal>
             ))}
           </div>

@@ -58,12 +58,12 @@ export const api = {
   // --- админка ---
   admin: {
     summary: () => request('/admin/summary', { auth: true }),
-    models: () => request('/models?all=1'),
+    models: () => request('/models?all=1', { auth: true }),
     createModel: (body) => request('/models', { method: 'POST', body, auth: true }),
     updateModel: (id, body) => request(`/models/${id}`, { method: 'PUT', body, auth: true }),
     deleteModel: (id) => request(`/models/${id}`, { method: 'DELETE', auth: true }),
 
-    news: () => request('/news?all=1'),
+    news: () => request('/news?all=1', { auth: true }),
     createNews: (body) => request('/news', { method: 'POST', body, auth: true }),
     updateNews: (id, body) => request(`/news/${id}`, { method: 'PUT', body, auth: true }),
     deleteNews: (id) => request(`/news/${id}`, { method: 'DELETE', auth: true }),

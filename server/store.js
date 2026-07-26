@@ -44,7 +44,13 @@ function freshData() {
     services: seed.services.map((s) => ({ ...s })),
     certs: seed.certs.map((c, i) => ({ ...c, id: i + 1 })),
     stats: seed.stats.map((s, i) => ({ ...s, id: i + 1 })),
-    requests: seed.requests.map((r) => ({ ...r, comment: '' })),
+    /* Демо-заявки с выдуманными ФИО и телефонами — только для разработки и
+       показа. На проде свежая база начинается с пустого списка: фейковые
+       имена в живой админке выглядят как утечка чужих данных. */
+    requests:
+      process.env.NODE_ENV === 'production'
+        ? []
+        : seed.requests.map((r) => ({ ...r, comment: '' })),
     settings: { ...seed.settings },
     aiCache: {},
   }
@@ -56,22 +62,41 @@ let data = freshData()
 
 let saveTimer = null
 
-/** Пишем через временный файл: обрыв записи не оставит битый store.json. */
+/** Пишем через временный файл: обрыв записи не оставит битый store.json.
+    Ошибку не глотаем, а пробрасываем — вызывающий решает, что делать
+    (заявку, например, откатить и вернуть форме честную ошибку). */
 function saveNow() {
-  try {
-    mkdirSync(dirname(STORE_PATH), { recursive: true })
-    const tmp = STORE_PATH + '.tmp'
-    writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-    renameSync(tmp, STORE_PATH)
-  } catch (e) {
-    console.error('Не удалось сохранить store.json:', e.message)
-  }
+  mkdirSync(dirname(STORE_PATH), { recursive: true })
+  const tmp = STORE_PATH + '.tmp'
+  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
+  renameSync(tmp, STORE_PATH)
 }
 
-/** Частые правки схлопываем в одну запись на диск. */
+/** Частые правки схлопываем в одну запись на диск (правки каталога, статусов). */
 function save() {
   clearTimeout(saveTimer)
-  saveTimer = setTimeout(saveNow, 150)
+  saveTimer = setTimeout(() => {
+    try {
+      saveNow()
+    } catch (e) {
+      console.error('Не удалось сохранить store.json:', e.message)
+    }
+  }, 150)
+}
+
+/** Немедленно дописать отложенный снимок, если он есть. Зовётся при
+    завершении процесса (SIGTERM перед деплоем), чтобы правки из 150-мс окна
+    не потерялись. */
+export function flush() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+    try {
+      saveNow()
+    } catch (e) {
+      console.error('Не удалось сохранить store.json при завершении:', e.message)
+    }
+  }
 }
 
 /** Загружает снимок с диска; если файла нет — берёт начальные данные. */
@@ -268,7 +293,15 @@ export const requests = {
       policyVersion: policyVersion || '',
     }
     data.requests.unshift(r)
-    save()
+    // Заявку — сразу на диск, не через отложенный save(): показать клиенту
+    // «отправлено» и потерять заявку в 150-мс окне или на ошибке записи
+    // недопустимо. Не записалось — откатываем и сообщаем об ошибке наверх.
+    try {
+      saveNow()
+    } catch (e) {
+      data.requests.shift()
+      throw e
+    }
     return clone(r)
   },
   setStatus(id, status) {
@@ -287,6 +320,31 @@ export const requests = {
   },
 }
 
+/* Что вкладка «Настройки» вправе менять. Всё остальное игнорируется: раньше
+   update() писал ЛЮБОЙ присланный ключ любой длины — их можно было засорить,
+   раздуть и подсунуть в системный промпт ИИ. Поля-ссылки (*_url) отдельно:
+   в href подвала мог попасть `javascript:…` и стать хранимым XSS. */
+const SETTING_KEYS = [
+  'phone',
+  'email',
+  'address',
+  'hours',
+  'legal_name',
+  'bin',
+  'leasing_url',
+  'subsidy_url',
+  'instagram_url',
+  'telegram_url',
+  'whatsapp_url',
+  'hero_title',
+  'hero_subtitle',
+]
+const URL_KEYS = new Set(['leasing_url', 'subsidy_url', 'instagram_url', 'telegram_url', 'whatsapp_url'])
+
+/** Ссылку принимаем только пустую или явный https:// — прочее (в т.ч.
+    javascript:, data:, http://) отбрасываем в пустую строку. */
+const safeUrl = (v) => (/^https:\/\/\S+$/i.test(v) ? v : '')
+
 export const settings = {
   /** Публичные настройки — без пароля админки. */
   publicAll() {
@@ -295,9 +353,11 @@ export const settings = {
   },
   get: (key) => data.settings[key] ?? '',
   update(patch) {
-    for (const [k, v] of Object.entries(patch)) {
-      if (k === 'admin_password') continue // пароль меняется только через .env
-      data.settings[k] = String(v)
+    for (const key of SETTING_KEYS) {
+      if (!(key in patch)) continue
+      let v = String(patch[key] ?? '').slice(0, 600)
+      if (URL_KEYS.has(key)) v = safeUrl(v)
+      data.settings[key] = v
     }
     save()
     return settings.publicAll()

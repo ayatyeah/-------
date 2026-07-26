@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
-import { ConsentCheck, Dialog } from './ui'
+import { ConsentCheck, Dialog, Honeypot } from './ui'
 
 /** Заявка на КП: имя, телефон, регион, комментарий. */
 function KPDialog() {
@@ -28,6 +28,7 @@ function KPDialog() {
         region: f.k_region.value,
         comment: f.k_comment.value.trim(),
         modelId: modal.modelId,
+        website: f.k_website.value, // honeypot — у людей пуст
         consent: true,
       })
       closeModal()
@@ -54,8 +55,18 @@ function KPDialog() {
         </div>
         <div className="field">
           <label htmlFor="k_phone">Телефон *</label>
-          <input id="k_phone" className="input" name="k_phone" required placeholder="+7 ___ ___ __ __" />
+          <input
+            id="k_phone"
+            className="input"
+            name="k_phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            required
+            placeholder="+7 ___ ___ __ __"
+          />
         </div>
+        <Honeypot name="k_website" />
         <div className="field">
           <label htmlFor="k_region">Регион</label>
           <select id="k_region" className="input" name="k_region">
@@ -104,6 +115,7 @@ function CallDialog() {
         type: 'Звонок',
         fio: f.cb_name.value.trim(),
         phone: f.cb_phone.value.trim(),
+        website: f.cb_website.value,
         consent: true,
       })
       closeModal()
@@ -128,8 +140,18 @@ function CallDialog() {
         </div>
         <div className="field">
           <label htmlFor="cb_phone">Телефон *</label>
-          <input id="cb_phone" className="input" name="cb_phone" required placeholder="+7 ___ ___ __ __" />
+          <input
+            id="cb_phone"
+            className="input"
+            name="cb_phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            required
+            placeholder="+7 ___ ___ __ __"
+          />
         </div>
+        <Honeypot name="cb_website" />
         <ConsentCheck id="cb_consent" checked={consent} onChange={setConsent} />
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={closeModal}>
