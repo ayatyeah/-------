@@ -47,6 +47,32 @@ if ! gzip -t "$FILE" 2>/dev/null; then
   exit 1
 fi
 
+# ─── Фотографии ────────────────────────────────────────────────────────────
+# Раньше копировался только store.json. С появлением загрузки фотографий из
+# админки этого мало: снимки лежат отдельными файлами, и копия без них
+# восстанавливает каталог с пустыми карточками.
+#
+# Архив собираем не каждый раз, а только когда содержимое изменилось:
+# фотографии добавляют редко, а весят они куда больше текста, и ежесуточный
+# одинаковый архив за две недели забил бы диск впустую.
+UPLOADS="${UPLOAD_DIR:-/data/uploads}"
+
+if [ -d "$UPLOADS" ] && [ -n "$(ls -A "$UPLOADS" 2>/dev/null)" ]; then
+  # Отпечаток содержимого: имена и размеры файлов. Совпал с прошлым разом —
+  # значит, ничего не добавили и не удалили, архив не нужен.
+  SUM=$(find "$UPLOADS" -type f -exec ls -l {} \; 2>/dev/null | awk '{print $5, $9}' | sort | md5sum | cut -c1-12)
+  MARK="$DEST/.uploads-last"
+
+  if [ ! -f "$MARK" ] || [ "$(cat "$MARK")" != "$SUM" ]; then
+    UP_FILE="$DEST/uploads-$STAMP.tar.gz"
+    tar -czf "$UP_FILE.part" -C "$UPLOADS" . && mv "$UP_FILE.part" "$UP_FILE"
+    echo "$SUM" > "$MARK"
+    log "копия фотографий: $(basename "$UP_FILE") ($(wc -c < "$UP_FILE" | tr -d ' ') байт)"
+  else
+    log "фотографии не менялись — новый архив не нужен"
+  fi
+fi
+
 # Чистим старые копии.
 # Имена переменных только латиницей: оболочка в Alpine (ash) кириллицу
 # в именах не принимает и падает с «not found».
@@ -54,6 +80,10 @@ removed=$(find "$DEST" -name 'store-*.json.gz' -type f -mtime "+$KEEP" -print -d
 if [ "$removed" -gt 0 ]; then
   log "удалено старых копий: $removed (храним $KEEP дней)"
 fi
+
+# Архивы фотографий храним дольше: их мало, а потеря снимков необратима —
+# заново их никто не сфотографирует.
+find "$DEST" -name 'uploads-*.tar.gz' -type f -mtime "+$((KEEP * 3))" -delete 2>/dev/null || true
 
 total=$(find "$DEST" -name 'store-*.json.gz' -type f | wc -l | tr -d ' ')
 log "всего копий в $DEST: $total"

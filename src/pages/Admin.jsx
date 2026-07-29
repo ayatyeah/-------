@@ -4,6 +4,15 @@ import { api, clearToken, formatDateShort, getToken, setToken } from '../api'
 import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
+import {
+  CategoriesPanel,
+  ServicesPanel,
+  StatsPanel,
+  CertsPanel,
+  RegionsPanel,
+  PasswordPanel,
+  BackupPanel,
+} from '../components/AdminPanels'
 import Icon from '../components/Icon'
 import usePageMeta from '../hooks/usePageMeta'
 
@@ -13,6 +22,9 @@ const TABS = [
   { id: 'services', name: 'Услуги' },
   { id: 'news', name: 'Новости' },
   { id: 'requests', name: 'Заявки' },
+  // Вкладка появилась вместе с правкой показателей и сертификатов: раньше
+  // и то и другое лежало в коде и менялось только через разработчика.
+  { id: 'main', name: 'Главная' },
   { id: 'settings', name: 'Настройки' },
 ]
 
@@ -159,6 +171,22 @@ function CatalogTab({ models, cats, reload }) {
   const { showToast } = useSite()
   const [editing, setEditing] = useState(null) // { model } | { model: null } для новой
 
+  /* Перестановка моделей. Раньше порядок задавался при создании и больше
+     не менялся: новая модель всегда падала в конец каталога, а поднять её
+     на витрину было нельзя. */
+  const move = async (index, шаг) => {
+    const j = index + шаг
+    if (j < 0 || j >= models.length) return
+    const next = [...models]
+    ;[next[index], next[j]] = [next[j], next[index]]
+    try {
+      await api.admin.reorderModels(next.map((m) => m.id))
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
   const save = async (data) => {
     if (editing.model) {
       await api.admin.updateModel(editing.model.id, data)
@@ -200,6 +228,7 @@ function CatalogTab({ models, cats, reload }) {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ width: 60 }}>Порядок</th>
                 <th>Название</th>
                 <th>Категория</th>
                 <th>Субсидия</th>
@@ -208,9 +237,32 @@ function CatalogTab({ models, cats, reload }) {
               </tr>
             </thead>
             <tbody>
-              {models.map((m) => (
+              {models.map((m, i) => (
                 <tr key={m.id}>
-                  <td style={{ fontWeight: 500 }}>{m.name}</td>
+                  <td>
+                    <div className="spec-move">
+                      <button
+                        type="button"
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                        title="Поднять"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(i, 1)}
+                        disabled={i === models.length - 1}
+                        title="Опустить"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </td>
+                  <td style={{ fontWeight: 500 }}>
+                    {m.photo && <img src={m.photo} alt="" className="admin-thumb" />}
+                    {m.name}
+                  </td>
                   <td style={{ color: 'var(--text-2)' }}>{m.catName}</td>
                   <td>
                     {m.subsidized ? (
@@ -250,6 +302,12 @@ function CatalogTab({ models, cats, reload }) {
         </div>
       )}
 
+      {/* Категории прямо здесь же: заводить отдельную вкладку ради четырёх
+          строк незачем, а рядом с каталогом им самое место. */}
+      <div style={{ marginTop: 40 }}>
+        <CategoriesPanel cats={cats} models={models} reload={reload} />
+      </div>
+
       {editing && (
         <ModelForm
           model={editing.model}
@@ -262,121 +320,10 @@ function CatalogTab({ models, cats, reload }) {
   )
 }
 
-/* ---------------------------- вкладка: услуги ---------------------------- */
-
-function ServicesTab({ services, reload }) {
-  const { showToast } = useSite()
-  const [editing, setEditing] = useState(null)
-  const [f, setF] = useState({ title: '', text: '', note: '' })
-  const [saving, setSaving] = useState(false)
-
-  const open = (s) => {
-    setEditing(s)
-    setF({ title: s.title, text: s.text, note: s.note })
-  }
-
-  async function save(e) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      await api.admin.updateService(editing.id, f)
-      showToast('Услуга обновлена')
-      setEditing(null)
-      reload()
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="admin-head">
-        <div>
-          <h1>Услуги</h1>
-          <p className="admin-hint">Блок «Услуги» на главной. Набор фиксирован — тексты меняются.</p>
-        </div>
-      </div>
-
-      <div className="admin-panel table-scroll">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Услуга</th>
-              <th>Описание</th>
-              <th>Подпись</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {services.map((s) => (
-              <tr key={s.id}>
-                <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{s.title}</td>
-                <td style={{ color: 'var(--text-2)', fontSize: 14, maxWidth: 460 }}>{s.text}</td>
-                <td style={{ color: 'var(--text-3)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                  {s.note}
-                </td>
-                <td>
-                  <div className="row-actions">
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => open(s)}>
-                      Изм.
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {editing && (
-        <Dialog title={`Услуга: ${editing.title}`} onClose={() => setEditing(null)} wide>
-          <form onSubmit={save}>
-            <div className="field">
-              <label htmlFor="sv_title">Заголовок</label>
-              <input
-                id="sv_title"
-                className="input"
-                required
-                value={f.title}
-                onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="sv_text">Описание</label>
-              <textarea
-                id="sv_text"
-                className="input"
-                style={{ minHeight: 120 }}
-                value={f.text}
-                onChange={(e) => setF((p) => ({ ...p, text: e.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="sv_note">Подпись под текстом</label>
-              <input
-                id="sv_note"
-                className="input"
-                value={f.note}
-                onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))}
-                placeholder="Короткий факт: «2 года гарантии»"
-              />
-            </div>
-            <div className="dialog-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>
-                Отмена
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Сохраняем…' : 'Сохранить'}
-              </button>
-            </div>
-          </form>
-        </Dialog>
-      )}
-    </>
-  )
-}
+/* ---------------------------- вкладка: услуги ----------------------------
+   Панель переехала в src/components/AdminPanels.jsx: там она умеет не
+   только править тексты, но и добавлять, удалять и переставлять карточки.
+   ------------------------------------------------------------------------ */
 
 /* ---------------------------- вкладка: новости --------------------------- */
 
@@ -737,7 +684,7 @@ function RequestsTab({ requests, reload }) {
 
 /* --------------------------- вкладка: настройки -------------------------- */
 
-function SettingsTab() {
+function SettingsTab({ onRelogin }) {
   const { settings, setSettings, showToast } = useSite()
   const [f, setF] = useState(settings)
   const [saving, setSaving] = useState(false)
@@ -839,6 +786,41 @@ function SettingsTab() {
       <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
         {saving ? 'Сохраняем…' : 'Сохранить изменения'}
       </button>
+
+      {/* Ниже — то, что сохраняется само по себе, отдельно от кнопки выше:
+          у каждого блока своя кнопка, чтобы не смешивать смену пароля с
+          правкой телефона в подвале. */}
+      <div className="admin-settings" style={{ marginTop: 34 }}>
+        <RegionsPanel />
+        <PasswordPanel onRelogin={onRelogin} />
+        <BackupPanel />
+      </div>
+    </>
+  )
+}
+
+/* --------------------------- вкладка: главная ---------------------------- */
+
+/**
+ * Показатели и сертификаты. Раньше и то и другое лежало в server/seed.js,
+ * а в ревью помечено как выдуманные данные, подлежащие замене до запуска, —
+ * то есть заказчику обязательно нужно их поменять, и он должен мочь это
+ * сделать сам.
+ */
+function MainTab({ stats, certs, reload }) {
+  return (
+    <>
+      <div className="admin-head">
+        <div>
+          <h1>Главная страница</h1>
+          <p className="admin-hint">Цифры и документы, которые видит посетитель на главной и в разделе «О компании».</p>
+        </div>
+      </div>
+
+      <div className="admin-settings">
+        <StatsPanel stats={stats} reload={reload} />
+        <CertsPanel certs={certs} reload={reload} />
+      </div>
     </>
   )
 }
@@ -855,6 +837,8 @@ export default function Admin() {
   const [cats, setCats] = useState([])
   const [news, setNews] = useState([])
   const [services, setServices] = useState([])
+  const [stats, setStats] = useState([])
+  const [certs, setCerts] = useState([])
   const [requests, setRequests] = useState([])
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
@@ -864,13 +848,15 @@ export default function Admin() {
     setLoading(true)
     setError(null)
     try {
-      const [m, c, n, r, s, sv] = await Promise.all([
+      const [m, c, n, r, s, sv, st, ct] = await Promise.all([
         api.admin.models(),
         api.categories(),
         api.admin.news(),
         api.admin.requests(),
         api.admin.summary(),
         api.services(),
+        api.stats(),
+        api.certs(),
       ])
       setModels(m)
       setCats(c)
@@ -878,6 +864,8 @@ export default function Admin() {
       setRequests(r)
       setSummary(s)
       setServices(sv)
+      setStats(st)
+      setCerts(ct)
     } catch (e) {
       // Токен протух или сервер отверг — возвращаем на экран входа.
       if (!getToken()) setAuthed(false)
@@ -956,10 +944,11 @@ export default function Admin() {
               <SummaryTab summary={summary} requests={requests} onGoTab={setTab} />
             )}
             {tab === 'catalog' && <CatalogTab models={models} cats={cats} reload={load} />}
-            {tab === 'services' && <ServicesTab services={services} reload={load} />}
+            {tab === 'services' && <ServicesPanel services={services} reload={load} />}
             {tab === 'news' && <NewsTab news={news} reload={load} />}
             {tab === 'requests' && <RequestsTab requests={requests} reload={load} />}
-            {tab === 'settings' && <SettingsTab />}
+            {tab === 'main' && <MainTab stats={stats} certs={certs} reload={load} />}
+            {tab === 'settings' && <SettingsTab onRelogin={logout} />}
           </>
         )}
       </div>

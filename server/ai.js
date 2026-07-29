@@ -683,8 +683,8 @@ function chatCacheKey(message, history, context) {
  * Отвечает на сообщение чата.
  * history — массив { role: 'user' | 'assistant', text } предыдущих реплик.
  */
-export async function chat(message, history = []) {
-  if (!aiEnabled()) return { reply: fallbackChat(message), engine: 'rules' }
+export async function chat(message, history = [], { rulesOnly = false } = {}) {
+  if (rulesOnly || !aiEnabled()) return { reply: fallbackChat(message), engine: 'rules' }
 
   const context = companyContext()
   const key = chatCacheKey(message, history, context)

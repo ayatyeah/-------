@@ -16,13 +16,22 @@ const CYCLE = [
   { icon: 'wrench', t: 'Обслуживаем', p: 'Сервис в поле и запчасти со склада' },
 ]
 
-/** Иконка под каждую категорию каталога. */
+/**
+ * Значок категории.
+ *
+ * Раньше здесь был жёсткий список идентификаторов из seed.js, и любая
+ * созданная заказчиком категория оставалась без картинки — блок молча
+ * рисовал пустое место. Теперь значок хранится в самой категории и
+ * выбирается в админке; список ниже нужен лишь для данных, созданных до
+ * этой правки.
+ */
 const CAT_ICON = {
   traktory: 'tractor',
   kombayny: 'combine',
   posev: 'seeder',
   pochva: 'harrow',
 }
+const иконкаКатегории = (c) => c.icon || CAT_ICON[c.id] || 'gear'
 
 export default function WhatWeDo({ models = [], categories = [] }) {
   // Считаем модели по категориям — цифры всегда честные, из каталога.
@@ -62,7 +71,7 @@ export default function WhatWeDo({ models = [], categories = [] }) {
             <div className="wwd-cats">
               {cats.map((c) => (
                 <Link className="wwd-cat" to={`/catalog?cat=${c.id}`} key={c.id}>
-                  <Icon name={CAT_ICON[c.id] ?? 'gear'} size={26} />
+                  <Icon name={иконкаКатегории(c)} size={26} />
                   <span className="wwd-cat-name">{c.name}</span>
                   <span className="wwd-cat-count">
                     {c.count} {c.count === 1 ? 'модель' : c.count < 5 ? 'модели' : 'моделей'}

@@ -35,7 +35,8 @@ FROM node:22-alpine
 ENV NODE_ENV=production \
     PORT=3001 \
     HOST=0.0.0.0 \
-    STORE_PATH=/data/store.json
+    STORE_PATH=/data/store.json \
+    UPLOAD_DIR=/data/uploads
 
 WORKDIR /app
 
@@ -47,9 +48,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY --from=build /app/dist ./dist
 
-# Данные лежат на томе. Каталог создаём заранее и отдаём пользователю node,
-# иначе процесс без прав root не сможет туда писать.
-RUN mkdir -p /data && chown -R node:node /data /app
+# Данные и загруженные фотографии лежат на томе. Каталоги создаём заранее и
+# отдаём пользователю node, иначе процесс без прав root не сможет туда
+# писать. /data/uploads — именно то место, где переживают деплой снимки,
+# загруженные заказчиком через админку.
+RUN mkdir -p /data/uploads && chown -R node:node /data /app
 
 # Работаем не от root: если в приложении найдётся дыра, она не даст прав
 # на весь контейнер. Образ node:alpine уже содержит пользователя node.

@@ -1,23 +1,64 @@
 import { useState } from 'react'
 import { Dialog } from './ui'
+import MediaPicker from './MediaPicker'
 
-const PHOTOS = [
-  { v: '', label: '— без фото —' },
-  { v: '/assets/tractor-green.webp', label: 'Трактор (зелёный)' },
-  { v: '/assets/combine-torum.webp', label: 'Комбайн' },
-  { v: '/assets/hero-field.webp', label: 'Поле / сев' },
-]
-
-/** Редактор характеристик: пары «параметр — значение». */
-function SpecsEditor({ specs, onChange }) {
+/**
+ * Редактор характеристик: пары «параметр — значение».
+ *
+ * Добавлено к прежней версии: перестановка строк и подстановка заготовки
+ * из категории. Порядок здесь не косметика — в карточке характеристики
+ * идут ровно так, как заданы, а «Мощность двигателя» посреди габаритов
+ * читается плохо.
+ */
+function SpecsEditor({ specs, onChange, template = [] }) {
   const set = (i, key, val) =>
     onChange(specs.map((s, idx) => (idx === i ? { ...s, [key]: val } : s)))
+
+  /** Меняет строку местами с соседней. */
+  const move = (i, шаг) => {
+    const j = i + шаг
+    if (j < 0 || j >= specs.length) return
+    const next = [...specs]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+
+  /* Подставляем параметры категории, не затирая уже заполненное:
+     повторно нажатая кнопка не должна стирать введённые значения. */
+  const подставитьШаблон = () => {
+    const есть = new Set(specs.map((s) => s.k.trim().toLowerCase()))
+    const добавить = template
+      .filter((k) => !есть.has(k.trim().toLowerCase()))
+      .map((k) => ({ k, v: '' }))
+    onChange([...specs, ...добавить])
+  }
 
   return (
     <div className="field">
       <label>Технические характеристики</label>
+
       {specs.map((s, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div key={i} className="spec-row">
+          <div className="spec-move">
+            <button
+              type="button"
+              onClick={() => move(i, -1)}
+              disabled={i === 0}
+              aria-label="Выше"
+              title="Поднять"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => move(i, 1)}
+              disabled={i === specs.length - 1}
+              aria-label="Ниже"
+              title="Опустить"
+            >
+              ↓
+            </button>
+          </div>
           <input
             className="input"
             placeholder="Параметр"
@@ -25,9 +66,8 @@ function SpecsEditor({ specs, onChange }) {
             onChange={(e) => set(i, 'k', e.target.value)}
           />
           <input
-            className="input"
+            className="input spec-val"
             placeholder="Значение"
-            style={{ maxWidth: 150 }}
             value={s.v}
             onChange={(e) => set(i, 'v', e.target.value)}
           />
@@ -41,13 +81,26 @@ function SpecsEditor({ specs, onChange }) {
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm"
-        onClick={() => onChange([...specs, { k: '', v: '' }])}
-      >
-        + Добавить строку
-      </button>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => onChange([...specs, { k: '', v: '' }])}
+        >
+          + Добавить строку
+        </button>
+        {template.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={подставитьШаблон}
+            title="Подставит названия параметров, принятые для этой категории"
+          >
+            + Параметры категории
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -102,39 +155,23 @@ export function ModelForm({ model, cats, onSave, onClose }) {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div className="field">
-            <label htmlFor="m_cat">Категория</label>
-            <select
-              id="m_cat"
-              className="input"
-              value={f.cat}
-              onChange={(e) => upd('cat', e.target.value)}
-            >
-              {cats.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="m_photo">Фото</label>
-            <select
-              id="m_photo"
-              className="input"
-              value={f.photo}
-              onChange={(e) => upd('photo', e.target.value)}
-            >
-              {PHOTOS.map((p) => (
-                <option key={p.v} value={p.v}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="field">
+          <label htmlFor="m_cat">Категория (тип техники)</label>
+          <select
+            id="m_cat"
+            className="input"
+            value={f.cat}
+            onChange={(e) => upd('cat', e.target.value)}
+          >
+            {cats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <MediaPicker value={f.photo} onChange={(v) => upd('photo', v)} label="Фотография модели" />
 
         <div className="field">
           <label htmlFor="m_short">Краткое описание</label>
@@ -158,7 +195,11 @@ export function ModelForm({ model, cats, onSave, onClose }) {
           />
         </div>
 
-        <SpecsEditor specs={specs} onChange={setSpecs} />
+        <SpecsEditor
+          specs={specs}
+          onChange={setSpecs}
+          template={cats.find((c) => c.id === f.cat)?.specTemplate ?? []}
+        />
 
         <div style={{ display: 'flex', gap: 22, marginTop: 6 }}>
           <label className="check">
@@ -241,33 +282,18 @@ export function NewsForm({ item, onSave, onClose }) {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div className="field">
-            <label htmlFor="n_date">Дата публикации</label>
-            <input
-              id="n_date"
-              type="date"
-              className="input"
-              value={f.date}
-              onChange={(e) => upd('date', e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="n_cover">Обложка</label>
-            <select
-              id="n_cover"
-              className="input"
-              value={f.cover}
-              onChange={(e) => upd('cover', e.target.value)}
-            >
-              {PHOTOS.map((p) => (
-                <option key={p.v} value={p.v}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="field">
+          <label htmlFor="n_date">Дата публикации</label>
+          <input
+            id="n_date"
+            type="date"
+            className="input"
+            value={f.date}
+            onChange={(e) => upd('date', e.target.value)}
+          />
         </div>
+
+        <MediaPicker value={f.cover} onChange={(v) => upd('cover', v)} label="Обложка статьи" />
 
         <div className="field">
           <label htmlFor="n_excerpt">Анонс</label>

@@ -22,8 +22,17 @@ export function MediaStub({ label }) {
 export function Media({ src, alt, stub, sizes = '(max-width: 720px) 100vw, 560px', priority = false }) {
   if (!src) return <MediaStub label={stub} />
 
-  const isWebp = src.endsWith('.webp')
-  const srcSet = isWebp
+  /* Мелкая версия (`-sm.webp`) существует только у снимков из комплекта,
+     которые лежат в /assets. У загруженных через админку фотографий её
+     нет: сервер картинки не пережимает (это потребовало бы тяжёлой
+     библиотеки), их ужимает браузер при загрузке.
+
+     Раньше srcSet собирался для любого .webp — и для загруженного фото
+     браузер на телефоне честно шёл за несуществующим `-sm.webp`, получал
+     404 и показывал вместо карточки пустоту. Поэтому набор размеров
+     объявляем только там, где он действительно есть. */
+  const hasSmall = src.startsWith('/assets/') && src.endsWith('.webp')
+  const srcSet = hasSmall
     ? `${src.replace(/\.webp$/, '-sm.webp')} 760w, ${src} 1200w`
     : undefined
 

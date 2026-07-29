@@ -15,10 +15,15 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as store from './store.js'
 import * as ai from './ai.js'
+import * as uploads from './uploads.js'
 import { notifyNewRequest } from './notify.js'
-import { REGIONS } from './seed.js'
 
-const { seeded } = store.load()
+const { seeded, recovered } = store.load()
+
+/* Страховочное сохранение раз в минуту. SIGTERM приходит не всегда:
+   при kill -9, срабатывании OOM-killer или пропаже питания на VPS его нет,
+   и всё, что накопилось в 150-мс окне отложенной записи, терялось. */
+store.startAutosave()
 
 const app = express()
 
@@ -65,6 +70,13 @@ const CSP = [
   "base-uri 'self'",
   "frame-ancestors 'none'",
   "form-action 'self'",
+  // Добавлено вместе с загрузкой картинок: даже если в каталог загрузок
+  // однажды попадёт html-подобный файл, он не сможет ни открыться рамкой,
+  // ни запустить воркер, ни утащить страницу в другой контекст.
+  "frame-src 'none'",
+  "worker-src 'self'",
+  "media-src 'self'",
+  "manifest-src 'self'",
 ].join('; ')
 
 // Защитные заголовки — без лишних зависимостей.
@@ -74,6 +86,16 @@ app.use((_req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.setHeader('Content-Security-Policy', CSP)
+  /* Отключаем то, чем сайт не пользуется. Без этого заголовка любой
+     сторонний код на странице (например, попавший через будущий виджет)
+     может молча запросить камеру, микрофон или геопозицию посетителя. */
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'
+  )
+  // Чужие сайты не должны подтягивать наши картинки и ответы API к себе.
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none')
   // HSTS только на проде за HTTPS: на localhost без TLS он бы намертво
   // заставил браузер ходить по https и сломал бы разработку.
   if (PROD) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains')
@@ -139,6 +161,69 @@ const limitAnalyze = rateLimit({
   message: 'Анализ уже запускался. Подождите минуту.',
 })
 
+/* Общий потолок на всё API.
+   Дыра, которая закрывается: точечные лимиты стояли только на входе,
+   заявках и ИИ. Открытые GET (/api/models, /api/home, /api/sitemap) были
+   без ограничений вовсе — а они читают данные из памяти и сериализуют
+   JSON. Скрипт в один поток забивал процессор и клал сайт для всех
+   остальных, не имея ни пароля, ни какого-либо доступа.
+
+   Порог высокий: живой посетитель, открыв каталог, тратит десяток
+   запросов, а SPA докладывает данные при переходах. 300/мин с одного
+   адреса человеку не достичь, автоматическому обстрелу — мгновенно. */
+const limitGlobal = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_GLOBAL || 300),
+  message: 'Слишком много запросов. Подождите минуту.',
+})
+
+/* Запись в админке. Токен есть только у своих, но украденный или
+   оставленный в чужом браузере токен не должен позволять стереть каталог
+   в тысячу запросов за секунду. */
+const limitAdminWrite = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: 'Слишком много изменений подряд. Подождите минуту.',
+})
+
+/* Загрузка картинок: даже свой человек не грузит больше пары десятков
+   снимков в минуту, а вот скрипт забьёт диск за минуты. Диск кончится —
+   перестанет писаться store.json, то есть перестанут приниматься заявки. */
+const limitUpload = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  message: 'Слишком много загрузок подряд. Подождите немного.',
+})
+
+/**
+ * Суточный потолок обращений к ИИ.
+ *
+ * Чат на главной открыт всему интернету, а каждый ответ стоит денег.
+ * Лимит частоты по адресу от этого не спасает: тысяча адресов — тысяча
+ * ведёрок. Здесь общий счётчик на весь сайт: исчерпан — чат продолжает
+ * работать на правилах, без ИИ. Сайт не ломается, счёт не растёт.
+ */
+const AI_DAILY_MAX = Number(process.env.AI_DAILY_LIMIT || 500)
+let aiDay = ''
+let aiUsedToday = 0
+
+function aiBudgetLeft() {
+  const day = new Date().toISOString().slice(0, 10)
+  if (day !== aiDay) {
+    aiDay = day
+    aiUsedToday = 0
+  }
+  return AI_DAILY_MAX - aiUsedToday
+}
+const aiBudgetTake = () => {
+  aiBudgetLeft()
+  aiUsedToday += 1
+}
+
+/* Общий лимит вешаем на всё дерево /api до объявления маршрутов —
+   так под ним оказывается и то, что появится позже. */
+app.use('/api', limitGlobal)
+
 /* ------------------------------- утилиты ------------------------------- */
 
 /* Редакция политики конфиденциальности. Записывается в каждую заявку рядом
@@ -153,17 +238,35 @@ const clean = (v, max) =>
   typeof v === 'string' ? v.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, max) : ''
 
 /**
- * Пароль админки: значение из .env перекрывает то, что лежит в данных.
- * Так пароль можно менять на сервере, не трогая контент.
+ * Пароль админки.
+ *
+ * Порядок такой: если заказчик задал свой пароль через админку — работает
+ * только он (в данных лежит scrypt-хэш, не сам пароль). Пока свой пароль
+ * не задан, действует ADMIN_PASSWORD из окружения: это первый вход и
+ * способ восстановления, если пароль забыли (см. npm run reset-password).
+ *
+ * Почему так, а не «переменная всегда главнее»: пока пароль жил только в
+ * .env, сменить его означало зайти по SSH и перезапустить контейнер.
+ * Заказчик этого не делает никогда — в том числе после увольнения
+ * сотрудника, который пароль знал.
  */
 const adminPassword = () => process.env.ADMIN_PASSWORD || store.settings.get('admin_password')
+
+/** Проверка введённого пароля — по хэшу, если он задан, иначе по .env. */
+function passwordOk(password) {
+  if (!password) return false
+  if (store.auth.hasPassword()) return store.auth.verify(password)
+  const expected = adminPassword()
+  return !!expected && safeEqual(password, expected)
+}
 
 /* На проде вход должен быть закрыт, пока пароль стандартный или пустой:
    иначе публичный сайт со стандартным «admin» пускает в админку кого угодно.
    Проверяем именно при попытке входа (а не при старте): падение процесса
    уронило бы весь сайт и загнало compose в цикл перезапусков — форма заявки
    и каталог должны работать независимо от того, настроен ли вход. */
-const loginLocked = () => PROD && (!adminPassword() || adminPassword() === 'admin')
+const loginLocked = () =>
+  PROD && !store.auth.hasPassword() && (!adminPassword() || adminPassword() === 'admin')
 
 /* ─── Сессия админки ────────────────────────────────────────────────────
    Раньше токен был просто sha256('shm-agro:' + пароль): без срока жизни, один
@@ -183,7 +286,13 @@ const loginLocked = () => PROD && (!adminPassword() || adminPassword() === 'admi
 const SESSION_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex')
 const SESSION_TTL_MS = Math.max(1, Number(process.env.SESSION_TTL_HOURS) || 12) * 3600 * 1000
 
-const signingKey = () => createHmac('sha256', SESSION_SECRET).update('sess:' + adminPassword()).digest()
+/* Ключ подписи зависит и от секрета, и от действующего пароля: сменили
+   пароль (хоть в админке, хоть в .env) — все выданные ранее токены сразу
+   становятся недействительными. Это и есть «выйти со всех устройств». */
+const signingKey = () =>
+  createHmac('sha256', SESSION_SECRET)
+    .update('sess:' + adminPassword() + ':' + store.auth.fingerprint())
+    .digest()
 
 const b64url = (buf) => Buffer.from(buf).toString('base64url')
 
@@ -232,13 +341,23 @@ const requireAdmin = (req, res, next) => {
   res.status(401).json({ error: 'Требуется вход в админку' })
 }
 
-/** Оборачивает обработчик, чтобы ошибка превращалась в 500, а не роняла процесс. */
+/** Оборачивает обработчик, чтобы ошибка превращалась в ответ, а не роняла процесс.
+ *
+ *  Проверки в хранилище бросают ошибки с полем status и человеческим
+ *  текстом («Категорий уже максимум»). Их и показываем: раньше любая такая
+ *  ошибка превращалась в безликую 500, и в админке было непонятно, что
+ *  именно не так. Всё, у чего status нет, — это уже настоящий сбой:
+ *  в лог подробности, наружу общая формулировка. */
 const wrap = (fn) => async (req, res) => {
   try {
     await fn(req, res)
   } catch (e) {
+    if (e?.status && e.status >= 400 && e.status < 500) {
+      if (!res.headersSent) res.status(e.status).json({ error: e.message })
+      return
+    }
     console.error('API error:', e)
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    if (!res.headersSent) res.status(500).json({ error: 'Внутренняя ошибка сервера' })
   }
 }
 
@@ -252,10 +371,45 @@ app.post('/api/login', limitLogin, wrap((req, res) => {
     })
   }
   const password = typeof req.body?.password === 'string' ? req.body.password : ''
-  if (password && safeEqual(password, adminPassword())) {
-    return res.json({ token: issueToken(), expiresInHours: SESSION_TTL_MS / 3600000 })
+  if (passwordOk(password)) {
+    return res.json({
+      token: issueToken(),
+      expiresInHours: SESSION_TTL_MS / 3600000,
+      // Подсказка панели: пароль всё ещё из .env, свой не задан.
+      ownPassword: store.auth.hasPassword(),
+    })
   }
   res.status(401).json({ error: 'Неверный пароль' })
+}))
+
+/**
+ * Смена пароля прямо из админки.
+ *
+ * Требуем текущий пароль, даже когда человек уже вошёл: иначе оставленная
+ * открытой вкладка (или украденный токен) даёт возможность сменить пароль
+ * и запереть настоящего владельца снаружи.
+ */
+app.post('/api/admin/password', requireAdmin, limitLogin, wrap((req, res) => {
+  const current = typeof req.body?.current === 'string' ? req.body.current : ''
+  const next = typeof req.body?.next === 'string' ? req.body.next : ''
+
+  if (!passwordOk(current)) {
+    return res.status(401).json({ error: 'Текущий пароль не подошёл' })
+  }
+  if (next.length < 10) {
+    return res.status(400).json({ error: 'Новый пароль должен быть не короче 10 символов' })
+  }
+  if (next.length > 200) {
+    return res.status(400).json({ error: 'Слишком длинный пароль' })
+  }
+  if (next === current) {
+    return res.status(400).json({ error: 'Новый пароль совпадает с текущим' })
+  }
+
+  store.auth.set(next)
+  // Ключ подписи привязан к паролю, поэтому старые токены (включая наш
+  // собственный) уже недействительны — панель попросит войти заново.
+  res.json({ ok: true, relogin: true })
 }))
 
 /* -------------------------- агрегат для главной ------------------------- */
@@ -277,15 +431,114 @@ app.get('/api/home', wrap((_req, res) => {
 /* ------------------------------ справочники ---------------------------- */
 
 app.get('/api/categories', wrap((_req, res) => res.json(store.categories.all())))
-app.get('/api/regions', wrap((_req, res) => res.json(REGIONS)))
+app.get('/api/regions', wrap((_req, res) => res.json(store.regions.all())))
 app.get('/api/certs', wrap((_req, res) => res.json(store.certs.all())))
 app.get('/api/stats', wrap((_req, res) => res.json(store.stats.all())))
 app.get('/api/services', wrap((_req, res) => res.json(store.services.all())))
 
-app.put('/api/services/:id', requireAdmin, wrap((req, res) => {
+/* ─── Категории («типы товара») ─────────────────────────────────────────
+   Раньше их набор был зашит в seed.js: чтобы завести пятую категорию,
+   нужен был программист и деплой. Теперь заказчик делает это сам. */
+
+app.post('/api/categories', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.categories.create(req.body || {}))
+}))
+
+app.put('/api/categories/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const c = store.categories.update(req.params.id, req.body || {})
+  if (!c) return res.status(404).json({ error: 'Категория не найдена' })
+  res.json(c)
+}))
+
+/**
+ * Удаление категории. Модели без категории превратились бы в невидимый
+ * мусор (каталог фильтрует по категориям), поэтому либо категория пуста,
+ * либо в запросе сказано, куда перенести технику.
+ */
+app.delete('/api/categories/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const r = store.categories.remove(req.params.id, req.query.moveTo || null)
+  if (r.ok) return res.json({ ok: true, moved: r.moved })
+  if (r.reason === 'not-found') return res.status(404).json({ error: 'Категория не найдена' })
+  res.status(409).json({
+    error: `В категории ещё ${r.count} модел${r.count === 1 ? 'ь' : 'и'}. Выберите, куда их перенести.`,
+    count: r.count,
+  })
+}))
+
+app.post('/api/categories/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.categories.reorder(req.body?.ids)
+  res.json(store.categories.all())
+}))
+
+/* ─── Услуги ────────────────────────────────────────────────────────────
+   Было: только правка текстов у шести неизменяемых карточек. */
+
+app.post('/api/services', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.services.create(req.body || {}))
+}))
+
+app.put('/api/services/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const s = store.services.update(req.params.id, req.body || {})
   if (!s) return res.status(404).json({ error: 'Услуга не найдена' })
   res.json(s)
+}))
+
+app.delete('/api/services/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  if (!store.services.remove(req.params.id)) {
+    return res.status(404).json({ error: 'Услуга не найдена' })
+  }
+  res.json({ ok: true })
+}))
+
+app.post('/api/services/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.services.reorder(req.body?.ids)
+  res.json(store.services.all())
+}))
+
+/* ─── Показатели и сертификаты ──────────────────────────────────────────
+   В ревью помечены как выдуманные («18 лет», «12 400+ единиц») и подлежат
+   замене перед запуском. Пока они лежали в коде, «заменить» означало
+   «позвать разработчика». */
+
+app.post('/api/stats', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.stats.create(req.body || {}))
+}))
+app.put('/api/stats/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const s = store.stats.update(req.params.id, req.body || {})
+  if (!s) return res.status(404).json({ error: 'Показатель не найден' })
+  res.json(s)
+}))
+app.delete('/api/stats/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  if (!store.stats.remove(req.params.id)) return res.status(404).json({ error: 'Показатель не найден' })
+  res.json({ ok: true })
+}))
+app.post('/api/stats/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.stats.reorder(req.body?.ids)
+  res.json(store.stats.all())
+}))
+
+app.post('/api/certs', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.certs.create(req.body || {}))
+}))
+app.put('/api/certs/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const c = store.certs.update(req.params.id, req.body || {})
+  if (!c) return res.status(404).json({ error: 'Документ не найден' })
+  res.json(c)
+}))
+app.delete('/api/certs/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  if (!store.certs.remove(req.params.id)) return res.status(404).json({ error: 'Документ не найден' })
+  res.json({ ok: true })
+}))
+app.post('/api/certs/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.certs.reorder(req.body?.ids)
+  res.json(store.certs.all())
+}))
+
+/* ─── Регионы формы КП ──────────────────────────────────────────────────
+   Список заменяется целиком: в админке это одно поле, где области идут
+   построчно — так проще, чем заводить карточку на каждую строку. */
+app.put('/api/regions', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.json(store.regions.replace(req.body?.regions))
 }))
 
 /* -------------------------------- модели ------------------------------- */
@@ -303,14 +556,14 @@ app.get('/api/models/:id', wrap((req, res) => {
   res.json(m)
 }))
 
-app.post('/api/models', requireAdmin, wrap((req, res) => {
+app.post('/api/models', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const { name, cat } = req.body || {}
   if (!name || !cat) return res.status(400).json({ error: 'Укажите название и категорию' })
   if (!store.categories.exists(cat)) return res.status(400).json({ error: 'Неизвестная категория' })
   res.status(201).json(store.models.create(req.body))
 }))
 
-app.put('/api/models/:id', requireAdmin, wrap((req, res) => {
+app.put('/api/models/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const b = req.body || {}
   if (b.cat && !store.categories.exists(b.cat)) {
     return res.status(400).json({ error: 'Неизвестная категория' })
@@ -320,11 +573,20 @@ app.put('/api/models/:id', requireAdmin, wrap((req, res) => {
   res.json(m)
 }))
 
-app.delete('/api/models/:id', requireAdmin, wrap((req, res) => {
+app.delete('/api/models/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   if (!store.models.remove(req.params.id)) {
     return res.status(404).json({ error: 'Модель не найдена' })
   }
   res.json({ ok: true })
+}))
+
+/* Порядок моделей в каталоге. Раньше он назначался при создании и больше
+   не менялся: новая модель всегда падала в конец списка, и поднять её
+   наверх было нельзя никак. Для каталога, где витриной служат первые
+   карточки, это существенно. */
+app.post('/api/models/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.models.reorder(req.body?.ids)
+  res.json(store.models.all({ includeUnpublished: true }))
 }))
 
 /* -------------------------------- новости ------------------------------ */
@@ -345,18 +607,18 @@ app.get('/api/news/:id', wrap((req, res) => {
   res.json(n)
 }))
 
-app.post('/api/news', requireAdmin, wrap((req, res) => {
+app.post('/api/news', requireAdmin, limitAdminWrite, wrap((req, res) => {
   if (!req.body?.title) return res.status(400).json({ error: 'Укажите заголовок' })
   res.status(201).json(store.news.create(req.body))
 }))
 
-app.put('/api/news/:id', requireAdmin, wrap((req, res) => {
+app.put('/api/news/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const n = store.news.update(req.params.id, req.body || {})
   if (!n) return res.status(404).json({ error: 'Статья не найдена' })
   res.json(n)
 }))
 
-app.delete('/api/news/:id', requireAdmin, wrap((req, res) => {
+app.delete('/api/news/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   if (!store.news.remove(req.params.id)) {
     return res.status(404).json({ error: 'Статья не найдена' })
   }
@@ -426,7 +688,7 @@ app.post('/api/requests', limitRequests, wrap(async (req, res) => {
   notifyNewRequest(saved)
 }))
 
-app.patch('/api/requests/:id', requireAdmin, wrap((req, res) => {
+app.patch('/api/requests/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const allowed = ['Новая', 'В работе', 'Обработана']
   if (!allowed.includes(req.body?.status)) {
     return res.status(400).json({ error: 'Недопустимый статус' })
@@ -436,7 +698,7 @@ app.patch('/api/requests/:id', requireAdmin, wrap((req, res) => {
   res.json(r)
 }))
 
-app.delete('/api/requests/:id', requireAdmin, wrap((req, res) => {
+app.delete('/api/requests/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   if (!store.requests.remove(req.params.id)) {
     return res.status(404).json({ error: 'Заявка не найдена' })
   }
@@ -447,8 +709,120 @@ app.delete('/api/requests/:id', requireAdmin, wrap((req, res) => {
 
 app.get('/api/settings', wrap((_req, res) => res.json(store.settings.publicAll())))
 
-app.put('/api/settings', requireAdmin, wrap((req, res) => {
+app.put('/api/settings', requireAdmin, limitAdminWrite, wrap((req, res) => {
   res.json(store.settings.update(req.body || {}))
+}))
+
+/* ------------------------------ фотографии ------------------------------ */
+
+/**
+ * Библиотека картинок: что загружено и чем занято.
+ * `usedBy` — список карточек, где картинка стоит: удалять фото из-под
+ * живой модели, ничего об этом не сказав, — верный способ получить
+ * каталог с дырами вместо снимков.
+ */
+app.get('/api/uploads', requireAdmin, wrap((_req, res) => {
+  const list = store.media.all().map((m) => ({ ...m, usedBy: store.media.usedBy(m.path) }))
+  res.json({
+    files: list,
+    usedBytes: uploads.usedBytes(),
+    quotaBytes: uploads.MAX_TOTAL_BYTES,
+  })
+}))
+
+/**
+ * Загрузка файла.
+ *
+ * Тело запроса — сам файл, без multipart: браузер шлёт File как есть
+ * (см. src/api.js), сервер получает готовый Buffer. Имя приходит
+ * заголовком X-File-Name и используется только как основа для читаемого
+ * имени; настоящее имя генерирует сервер.
+ *
+ * express.raw объявлен прямо здесь, а не глобально: общий разбор JSON
+ * ограничен 64 КБ, и поднимать этот предел ради одной ручки нельзя — это
+ * открыло бы приём мегабайтных тел на всех остальных маршрутах.
+ */
+app.post(
+  '/api/uploads',
+  requireAdmin,
+  limitUpload,
+  express.raw({ type: () => true, limit: uploads.MAX_FILE_BYTES }),
+  wrap((req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Пустой файл' })
+    }
+    // Имя из заголовка декодируем осторожно: там может быть что угодно,
+    // включая некорректную последовательность — падать из-за этого нельзя.
+    let original = ''
+    try {
+      original = decodeURIComponent(req.headers['x-file-name'] || '')
+    } catch {
+      original = ''
+    }
+
+    const saved = uploads.saveImage(req.body, original)
+    const entry = store.media.add({ ...saved, title: original.slice(0, 120) })
+    res.status(201).json(entry)
+  })
+)
+
+app.delete('/api/uploads/:name', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const name = req.params.name
+  const path = `${uploads.UPLOAD_URL_PREFIX}/${name}`
+  const usedBy = store.media.usedBy(path)
+
+  // Заставляем подтвердить, если картинка где-то стоит: без этого одно
+  // неверное нажатие оставляет карточки без фотографий, и восстановить
+  // связь потом можно только вручную по всему каталогу.
+  if (usedBy.length && req.query.force !== '1') {
+    return res.status(409).json({
+      error: `Картинка используется: ${usedBy.slice(0, 3).join(', ')}${usedBy.length > 3 ? '…' : ''}`,
+      usedBy,
+    })
+  }
+
+  uploads.removeFile(name)
+  store.media.remove(name)
+  res.json({ ok: true })
+}))
+
+/**
+ * Отдача загруженных картинок.
+ *
+ * Отдельным маршрутом, а не express.static, по трём причинам:
+ *   1. Content-Type ставим сами, по сигнатуре формата из имени файла —
+ *      браузер не должен гадать, что ему прислали;
+ *   2. Content-Disposition: inline + nosniff — файл показывается как
+ *      картинка и никогда не исполняется как страница;
+ *   3. каталог загрузок лежит на томе с данными, вне dist/, и статикой
+ *      его раздавать было бы неудобно.
+ */
+app.get('/uploads/:name', (req, res) => {
+  const full = uploads.fileExists(req.params.name)
+  if (!full) return res.status(404).end()
+  res.setHeader('Content-Type', uploads.mimeByName(req.params.name))
+  res.setHeader('Content-Disposition', 'inline')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  // Имя файла уникально и не переиспользуется, поэтому кешируем надолго.
+  res.setHeader('Cache-Control', 'public, max-age=2592000, immutable')
+  res.sendFile(full)
+})
+
+/* --------------------------- резервная копия ---------------------------- */
+
+/**
+ * Выгрузка всего содержимого сайта одним файлом.
+ *
+ * На сервере копии делаются сами (контейнер backup), но лежат они там же,
+ * где сайт. Кнопка в админке даёт заказчику копию у себя на компьютере —
+ * без SSH и без обращения к разработчику. Пароль и кэш ИИ в выгрузку не
+ * попадают.
+ */
+app.get('/api/admin/export', requireAdmin, wrap((_req, res) => {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="shmagro-${stamp}.json"`)
+  res.send(JSON.stringify(store.snapshot(), null, 2))
 }))
 
 /* --------------------------- robots и sitemap ---------------------------- */
@@ -547,13 +921,39 @@ app.get('/api/ai/status', wrap((_req, res) => {
 }))
 
 app.post('/api/ai/analyze-leads', requireAdmin, limitAnalyze, wrap(async (_req, res) => {
+  if (aiBudgetLeft() <= 0) {
+    return res.status(429).json({
+      error: 'Суточный лимит обращений к ИИ исчерпан. Анализ вернётся завтра.',
+    })
+  }
+  aiBudgetTake()
   res.json(await ai.analyzeLeads())
 }))
 
 app.post('/api/ai/chat', limitChat, wrap(async (req, res) => {
   const message = clean(req.body?.message, 2000)
   if (!message) return res.status(400).json({ error: 'Пустое сообщение' })
-  const history = Array.isArray(req.body?.history) ? req.body.history.slice(-8) : []
+
+  /* История приходит от клиента, то есть от кого угодно. Раньше сюда
+     улетал сырой массив: ограничение стояло только на количество реплик,
+     а роль и длина каждой брались как есть. Через такое поле удобно
+     подсовывать модели чужие инструкции и раздувать промпт (за токены
+     платим мы). Оставляем строго роль + текст, всё лишнее отбрасываем. */
+  const history = (Array.isArray(req.body?.history) ? req.body.history : [])
+    .slice(-8)
+    .map((h) => ({
+      role: h?.role === 'assistant' ? 'assistant' : 'user',
+      text: clean(h?.text, 1000),
+    }))
+    .filter((h) => h.text)
+
+  /* Бюджет кончился — не отказываем посетителю, а отвечаем по правилам.
+     Чат на главной открыт всем, и «сервис недоступен» на живом сайте
+     выглядит как поломка. Правила отвечают хуже, но отвечают. */
+  if (aiBudgetLeft() <= 0) {
+    return res.json({ ...(await ai.chat(message, history, { rulesOnly: true })), engine: 'rules' })
+  }
+  aiBudgetTake()
   res.json(await ai.chat(message, history))
 }))
 
@@ -583,7 +983,19 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist')
    кодом 200 на ЛЮБОЙ адрес (soft-404), и мусорные ссылки попадали в поисковый
    индекс. Список статических путей + шаблоны карточек с :id.
    При добавлении нового маршрута в App.jsx — добавить и сюда. */
-const KNOWN_PATHS = new Set(['/', '/about', '/catalog', '/news', '/contacts', '/privacy', '/terms'])
+const KNOWN_PATHS = new Set([
+  '/',
+  '/about',
+  '/catalog',
+  '/news',
+  '/contacts',
+  '/privacy',
+  '/terms',
+  /* Админка — существующая страница, и отдавать по ней 404 неправильно:
+     мониторинг и браузер считают адрес битым. От индексации её защищают
+     Disallow в robots.txt и noindex на самой странице, а не код ответа. */
+  '/admin',
+])
 const KNOWN_PREFIXES = ['/catalog/', '/news/']
 const isKnownRoute = (p) =>
   KNOWN_PATHS.has(p) || KNOWN_PREFIXES.some((pre) => p.startsWith(pre) && p.length > pre.length)
@@ -646,6 +1058,10 @@ function проверитьОкружение() {
 const server = app.listen(PORT, HOST, () => {
   console.log(`✓ API СХМ Агро слушает ${HOST}:${PORT}`)
   console.log(`  Данные: ${store.STORE_PATH}${seeded ? ' (создан из начальных)' : ''}`)
+  if (recovered) {
+    console.warn('  ⚠ основной файл данных не читался — поднялись из копии, проверьте содержимое')
+  }
+  console.log(`  Картинки: ${uploads.UPLOAD_DIR}`)
   console.log(
     `  ИИ: ${ai.aiEnabled() ? ai.aiEngine() + ' подключён' : 'правила (ключи не заданы)'}`
   )
@@ -653,15 +1069,89 @@ const server = app.listen(PORT, HOST, () => {
   проверитьОкружение()
 })
 
+/* ───────────────────── Живучесть процесса ─────────────────────────────
+   Всё, что ниже, отвечает на жалобу «сайт сам по себе падает».
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Таймауты сокетов.
+   По умолчанию Node держит соединение открытым, пока клиент не отвалится
+   сам. Медленный или намеренно «залипший» клиент (классическая атака
+   slowloris) занимает соединения одно за другим, и сайт перестаёт
+   отвечать живым посетителям при полностью здоровом процессе — снаружи
+   это выглядит как падение.
+
+   keepAliveTimeout чуть больше, чем у Caddy впереди: если закрывать
+   раньше прокси, тот периодически получает обрыв на уже отправленном
+   запросе и отдаёт посетителю 502 на ровном месте. */
+server.keepAliveTimeout = 65_000
+server.headersTimeout = 70_000
+server.requestTimeout = 30_000
+
 /* Аккуратное завершение. Docker при остановке и деплое шлёт SIGTERM: успеваем
    дописать отложенный снимок (правки каталога/статусов из 150-мс окна), иначе
    они потерялись бы. Заявки и так пишутся сразу, но правки админки — нет. */
-function shutdown(signal) {
+let выключаемся = false
+function shutdown(signal, code = 0) {
+  if (выключаемся) return
+  выключаемся = true
   console.log(`\n${signal}: завершаюсь, сохраняю данные…`)
   store.flush()
-  server.close(() => process.exit(0))
+  server.close(() => process.exit(code))
   // Если соединения висят — не ждём вечно.
-  setTimeout(() => process.exit(0), 5000).unref()
+  setTimeout(() => process.exit(code), 5000).unref()
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
+
+/**
+ * Необработанное отклонение промиса.
+ *
+ * С Node 15 такое отклонение по умолчанию убивает процесс. Один забытый
+ * .catch() в необязательном месте (уведомление в Telegram, запрос к ИИ)
+ * ронял весь сайт вместе с приёмом заявок. Это ровно тот случай, когда
+ * падать нельзя: сбой второстепенный, а последствия — общие.
+ *
+ * Поэтому пишем в лог и продолжаем работать. Данные при этом не при чём:
+ * состояние в памяти цело, отложенный снимок на месте.
+ */
+process.on('unhandledRejection', (reason) => {
+  console.error('Необработанное отклонение промиса (продолжаю работу):', reason)
+})
+
+/**
+ * Необработанное исключение — случай тяжелее.
+ *
+ * После него состояние процесса считается ненадёжным: могли остаться
+ * незакрытые ресурсы и половина выполненной операции. Продолжать работу
+ * в таком виде опаснее, чем перезапуститься: Docker с restart-политикой
+ * поднимет контейнер за секунду.
+ *
+ * Что важно: перед выходом обязательно дописываем данные. Иначе как раз
+ * при аварийном выходе терялись бы правки, сделанные в админке за
+ * последние секунды.
+ */
+process.on('uncaughtException', (err) => {
+  console.error('Необработанное исключение — сохраняю данные и перезапускаюсь:', err)
+  try {
+    store.flush()
+  } catch {
+    /* если и это не вышло — выходим всё равно, иначе процесс зависнет */
+  }
+  shutdown('uncaughtException', 1)
+})
+
+/* Предупреждение о нехватке памяти.
+   На VPS с 1–2 ГБ процесс убивает OOM-killer, и в логах остаётся ровно
+   ничего — сайт «просто пропал». Раз в 5 минут смотрим на кучу и заранее
+   пишем в лог, если она подобралась к пределу: тогда причина видна до
+   того, как контейнер исчезнет. */
+const HEAP_WARN_MB = Number(process.env.HEAP_WARN_MB || 0)
+if (HEAP_WARN_MB > 0) {
+  const t = setInterval(() => {
+    const usedMb = Math.round(process.memoryUsage().heapUsed / 1048576)
+    if (usedMb >= HEAP_WARN_MB) {
+      console.warn(`⚠ Память: занято ${usedMb} МБ кучи (порог ${HEAP_WARN_MB} МБ).`)
+    }
+  }, 5 * 60 * 1000)
+  t.unref()
+}
