@@ -104,12 +104,12 @@ systemctl restart fail2ban
 # Отключаем вход по паролю — но только если ключи уже настроены. Иначе
 # скрипт запер бы владельца снаружи, и восстанавливать доступ пришлось бы
 # через консоль хостера.
-КЛЮЧИ=0
+KEYS=0
 for f in /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys; do
-  [ -s "$f" ] && КЛЮЧИ=$((КЛЮЧИ + 1))
+  [ -s "$f" ] && KEYS=$((KEYS + 1))
 done
 
-if [ "$КЛЮЧИ" -gt 0 ]; then
+if [ "$KEYS" -gt 0 ]; then
   cat > /etc/ssh/sshd_config.d/99-hardening.conf <<'EOF'
 # Вход только по ключу: пароль к SSH подбирают круглосуточно, ключ — нет.
 PasswordAuthentication no
@@ -126,7 +126,7 @@ X11Forwarding no
 EOF
   if sshd -t 2>/dev/null; then
     systemctl reload ssh 2>/dev/null || systemctl reload sshd
-    готово "вход по паролю отключён (найдено файлов с ключами: $КЛЮЧИ)"
+    готово "вход по паролю отключён (найдено файлов с ключами: $KEYS)"
   else
     rm -f /etc/ssh/sshd_config.d/99-hardening.conf
     внимание "конфигурация SSH не прошла проверку — оставил как было"
@@ -143,10 +143,10 @@ fi
 # ядро убивает процессы — чаще всего не тот, который виноват. Подкачка
 # превращает падение в замедление.
 if ! swapon --show | grep -q .; then
-  ПАМЯТЬ_МБ=$(free -m | awk '/^Mem:/{print $2}')
-  РАЗМЕР=2G
-  [ "$ПАМЯТЬ_МБ" -ge 4000 ] && РАЗМЕР=1G
-  fallocate -l "$РАЗМЕР" /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+  MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
+  SWAP_SIZE=2G
+  [ "$MEM_MB" -ge 4000 ] && SWAP_SIZE=1G
+  fallocate -l "$SWAP_SIZE" /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
   chmod 600 /swapfile
   mkswap /swapfile >/dev/null
   swapon /swapfile
@@ -154,7 +154,7 @@ if ! swapon --show | grep -q .; then
   # Подкачку используем неохотно: она медленная, нужна как страховка.
   sysctl -w vm.swappiness=10 >/dev/null
   grep -q 'vm.swappiness' /etc/sysctl.conf || echo 'vm.swappiness=10' >> /etc/sysctl.conf
-  готово "файл подкачки $РАЗМЕР создан"
+  готово "файл подкачки $SWAP_SIZE создан"
 else
   готово "подкачка уже настроена"
 fi

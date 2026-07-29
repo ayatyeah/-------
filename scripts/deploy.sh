@@ -57,18 +57,18 @@ fi
 # ---------------------------------------------------------------------------
 шаг "Забираю изменения из репозитория"
 # ---------------------------------------------------------------------------
-ПРЕДЫДУЩИЙ=$(git rev-parse HEAD)
-echo "  текущая версия: ${ПРЕДЫДУЩИЙ:0:8}"
+PREV=$(git rev-parse HEAD)
+echo "  текущая версия: ${PREV:0:8}"
 
 git fetch --quiet origin
 git reset --hard origin/main --quiet
-НОВЫЙ=$(git rev-parse HEAD)
+NEW=$(git rev-parse HEAD)
 
-if [ "$ПРЕДЫДУЩИЙ" = "$НОВЫЙ" ]; then
+if [ "$PREV" = "$NEW" ]; then
   готово "изменений нет — версия уже последняя"
 else
-  echo "  новая версия:   ${НОВЫЙ:0:8}"
-  git --no-pager log --oneline "$ПРЕДЫДУЩИЙ..$НОВЫЙ" | sed 's/^/    /'
+  echo "  новая версия:   ${NEW:0:8}"
+  git --no-pager log --oneline "$PREV..$NEW" | sed 's/^/    /'
 fi
 
 # ---------------------------------------------------------------------------
@@ -83,17 +83,17 @@ docker compose up -d
 # Ждём до 90 секунд: столько нужно на старт процесса и первую проверку
 # здоровья. Проверяем изнутри сети compose, чтобы не зависеть от домена и
 # сертификата.
-ОТВЕТИЛ=нет
+RESPONDED=нет
 for i in $(seq 1 30); do
   if docker compose exec -T web node -e \
     "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-    ОТВЕТИЛ=да
+    RESPONDED=да
     break
   fi
   sleep 3
 done
 
-if [ "$ОТВЕТИЛ" = "да" ]; then
+if [ "$RESPONDED" = "да" ]; then
   готово "сайт отвечает, обновление завершено"
   docker compose ps
   # Старые образы занимают место; на диске в 25 ГБ это ощутимо.
@@ -109,11 +109,11 @@ echo "Последние строки лога:"
 docker compose logs --tail 40 web | sed 's/^/    /'
 echo
 
-git reset --hard "$ПРЕДЫДУЩИЙ" --quiet
+git reset --hard "$PREV" --quiet
 docker compose build web
 docker compose up -d
 
 echo
-ошибка "откат выполнен на версию ${ПРЕДЫДУЩИЙ:0:8}"
+ошибка "откат выполнен на версию ${PREV:0:8}"
 echo "  Причина в логе выше. Данные и фотографии не пострадали — они на отдельном томе."
 exit 1

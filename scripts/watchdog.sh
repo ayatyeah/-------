@@ -24,20 +24,20 @@
 # ============================================================================
 set -uo pipefail
 
-ПРОЕКТ="${PROJECT_DIR:-/opt/shm-agro}"
-cd "$ПРОЕКТ" || exit 0
+PROJ="${PROJECT_DIR:-/opt/shm-agro}"
+cd "$PROJ" || exit 0
 
 лог() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-СОСТОЯНИЕ=$(docker compose ps --format '{{.Name}} {{.State}} {{.Health}}' 2>/dev/null | grep -E '(^|-)web' || true)
+STATE=$(docker compose ps --format '{{.Name}} {{.State}} {{.Health}}' 2>/dev/null | grep -E '(^|-)web' || true)
 
-if [ -z "$СОСТОЯНИЕ" ]; then
+if [ -z "$STATE" ]; then
   лог "контейнер web не найден — поднимаю"
   docker compose up -d web
   exit 0
 fi
 
-case "$СОСТОЯНИЕ" in
+case "$STATE" in
   *unhealthy*)
     лог "web помечен unhealthy — перезапускаю"
     # Сохраняем хвост лога: после перезапуска причина исчезнет, а понять,
@@ -47,7 +47,7 @@ case "$СОСТОЯНИЕ" in
     лог "перезапуск выполнен"
     ;;
   *exited*|*restarting*)
-    лог "web в состоянии «$СОСТОЯНИЕ» — поднимаю"
+    лог "web в состоянии «$STATE» — поднимаю"
     docker compose logs --tail 60 web
     docker compose up -d web
     ;;
@@ -60,7 +60,7 @@ esac
 # ─── Место на диске ────────────────────────────────────────────────────────
 # Кончившийся диск останавливает запись store.json, то есть приём заявок.
 # Предупредить лучше заранее.
-ЗАНЯТО=$(df --output=pcent / | tail -1 | tr -d ' %')
-if [ "${ЗАНЯТО:-0}" -ge 85 ]; then
-  лог "ВНИМАНИЕ: диск занят на ${ЗАНЯТО}% — проверьте папку backups и docker system df"
+DISK_USED=$(df --output=pcent / | tail -1 | tr -d ' %')
+if [ "${DISK_USED:-0}" -ge 85 ]; then
+  лог "ВНИМАНИЕ: диск занят на ${DISK_USED}% — проверьте папку backups и docker system df"
 fi
