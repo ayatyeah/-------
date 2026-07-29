@@ -413,13 +413,20 @@ FIO_CODE=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/jso
 case "$FIO_CODE" in 201|400) ok "ФИО в 10000 символов → $FIO_CODE (обрезано или отклонено), сервер жив" ;; *) bad "ФИО 10000 символов" "201 или 400" "$FIO_CODE" ;; esac
 check "сервер жив после длинного ФИО" 200 "$(status "$BASE/api/health")"
 
-RATE_HIT=no
-for i in $(seq 1 8); do
-  C=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
-    -d "{\"type\":\"call\",\"fio\":\"ZZTEST Лимит $i\",\"phone\":\"+7 700 000 00 0$i\",\"consent\":true}")
-  if [ "$C" = "429" ]; then RATE_HIT=yes; break; fi
-done
-if [ "$RATE_HIT" = "yes" ]; then ok "лимит частоты на заявки сработал (лимит 5/10мин)"; else bad "лимит частоты на заявки" "429 после 5-й" "не сработал за 8 попыток"; fi
+# SKIP_LOCKOUT_TESTS=1 пропускает эту проверку и проверку логин-лимита в 3.7:
+# обе нарочно добивают лимит частоты, а на боевом это на 10-15 минут запирает
+# форму КП и вход в админку для настоящих посетителей, не только для теста.
+if [ "${SKIP_LOCKOUT_TESTS:-0}" = "1" ]; then
+  echo "    (пропущено: SKIP_LOCKOUT_TESTS=1 — не запираем форму КП на боевом)"
+else
+  RATE_HIT=no
+  for i in $(seq 1 8); do
+    C=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
+      -d "{\"type\":\"call\",\"fio\":\"ZZTEST Лимит $i\",\"phone\":\"+7 700 000 00 0$i\",\"consent\":true}")
+    if [ "$C" = "429" ]; then RATE_HIT=yes; break; fi
+  done
+  if [ "$RATE_HIT" = "yes" ]; then ok "лимит частоты на заявки сработал (лимит 5/10мин)"; else bad "лимит частоты на заявки" "429 после 5-й" "не сработал за 8 попыток"; fi
+fi
 
 # подчищаем тестовые заявки
 ALL_REQ=$(body "$BASE/api/requests" "${AUTH[@]}")
@@ -436,13 +443,17 @@ for r in json.load(sys.stdin):
 echo
 echo "=== 3.7. Лимиты частоты ==="
 # ============================================================================
-LOGIN_BLOCKED=no
-for i in $(seq 1 12); do
-  C=$(status -X POST "$BASE/api/login" -H 'Content-Type: application/json' -d '{"password":"ZZTEST-wrong"}')
-  if [ "$C" = "429" ]; then LOGIN_BLOCKED=yes; echo "    (блокировка на попытке №$i)"; break; fi
-done
-if [ "$LOGIN_BLOCKED" = "yes" ]; then ok "после ~10 неверных паролей — блокировка (429)"; else bad "блокировка по неверным паролям" "429 после 10-й" "не сработала за 12 попыток"; fi
-echo "    (пароль верного администратора не задет — своя запись по паролю ZZTEST-wrong)"
+if [ "${SKIP_LOCKOUT_TESTS:-0}" = "1" ]; then
+  echo "    (пропущено: SKIP_LOCKOUT_TESTS=1 — не запираем вход в админку на боевом)"
+else
+  LOGIN_BLOCKED=no
+  for i in $(seq 1 12); do
+    C=$(status -X POST "$BASE/api/login" -H 'Content-Type: application/json' -d '{"password":"ZZTEST-wrong"}')
+    if [ "$C" = "429" ]; then LOGIN_BLOCKED=yes; echo "    (блокировка на попытке №$i)"; break; fi
+  done
+  if [ "$LOGIN_BLOCKED" = "yes" ]; then ok "после ~10 неверных паролей — блокировка (429)"; else bad "блокировка по неверным паролям" "429 после 10-й" "не сработала за 12 попыток"; fi
+  echo "    (пароль верного администратора не задет — своя запись по паролю ZZTEST-wrong)"
+fi
 
 check "подделанный X-Forwarded-For игнорируется без TRUST_PROXY" 200 "$(status "$BASE/api/health" -H 'X-Forwarded-For: 1.2.3.4')"
 echo "    (нагрузочные проверки 400 запросов/60 загрузок — см. часть 4, только локально)"
