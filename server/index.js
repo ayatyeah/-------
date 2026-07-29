@@ -102,6 +102,23 @@ app.use((_req, res, next) => {
   next()
 })
 
+/* Cache-Control для /api по умолчанию.
+ *
+ * Ответ без Cache-Control, но с сильным ETag (см. app.set('etag', 'strong')
+ * выше) — это приглашение к эвристическому кешированию: браузер и любые
+ * промежуточные кеши вправе сами решать, сколько считать его свежим.
+ * Практическое следствие: правка в админке не видна на сайте без жёсткого
+ * обновления.
+ *
+ * no-cache — не «не кешировать», а «перед показом спроси, не устарел ли».
+ * С сильным ETag это дешёвый 304 без тела, а правка видна сразу.
+ * Для маршрутов за requireAdmin ниже это переопределяется на no-store —
+ * там персональные данные заявок и секреты, которым в кеше не место вовсе. */
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache')
+  next()
+})
+
 const PORT = process.env.PORT || 3001
 
 /* Слушаем на всех интерфейсах явно.
@@ -337,6 +354,9 @@ const isAdmin = (req) => {
 }
 
 const requireAdmin = (req, res, next) => {
+  // Персональные данные заявок и секреты не должны оседать ни в браузере,
+  // ни в промежуточных кешах — ни при успехе, ни при отказе в 401.
+  res.setHeader('Cache-Control', 'no-store')
   if (isAdmin(req)) return next()
   res.status(401).json({ error: 'Требуется вход в админку' })
 }
@@ -364,6 +384,8 @@ const wrap = (fn) => async (req, res) => {
 /* --------------------------------- auth -------------------------------- */
 
 app.post('/api/login', limitLogin, wrap((req, res) => {
+  // Токен в ответе — секрет не хуже пароля, кешу его показывать незачем.
+  res.setHeader('Cache-Control', 'no-store')
   // Пока пароль не сменили со стандартного — на проде вход закрыт целиком.
   if (loginLocked()) {
     return res.status(503).json({
@@ -632,6 +654,9 @@ app.get('/api/requests', requireAdmin, wrap((_req, res) => res.json(store.reques
 // Публичный: формы КП / звонка / обратной связи. Открыт всему интернету,
 // поэтому здесь и ограничитель частоты, и обрезка полей по длине.
 app.post('/api/requests', limitRequests, wrap(async (req, res) => {
+  // Ответ эхом содержит только что введённые имя, телефон и комментарий —
+  // те же персональные данные, что и в списке заявок для админа.
+  res.setHeader('Cache-Control', 'no-store')
   const { type, modelId, region, meta } = req.body || {}
   const fio = clean(req.body?.fio, 100)
   const phone = clean(req.body?.phone, 40)
@@ -1001,14 +1026,24 @@ const isKnownRoute = (p) =>
   KNOWN_PATHS.has(p) || KNOWN_PREFIXES.some((pre) => p.startsWith(pre) && p.length > pre.length)
 
 if (existsSync(DIST)) {
-  // Ассеты именованы с хешем — кешируем их надолго.
+  // Ассеты именованы по хешу содержимого — кешируем навсегда.
   app.use('/assets', express.static(join(DIST, 'assets'), { immutable: true, maxAge: '1y' }))
-  app.use(express.static(DIST, { maxAge: '1h' }))
+
+  // index: false — чтобы `/` не отдавался отсюда, а шёл в единственный
+  // обработчик ниже. Иначе index.html раздаётся двумя путями с разными
+  // заголовками, и поведение зависит от того, с какого адреса зашли.
+  app.use(express.static(DIST, { maxAge: '1h', index: false }))
+
   // SPA: клиент рисует и страницу, и её «не найдено» сам, поэтому отдаём тот
   // же index.html — но известному маршруту со статусом 200, а неизвестному
   // с 404, чтобы поисковик не индексировал несуществующие адреса.
   app.get(/^(?!\/api).*/, (req, res) => {
     const status = isKnownRoute(req.path) ? 200 : 404
+    /* no-cache — это не «не кешировать», а «перед показом спроси, не устарел ли».
+       Входной документ ссылается на ассеты по хешу; после деплоя старых хешей в
+       dist/ уже нет, и закешированный HTML уводит браузер за файлом, которого не
+       существует. ETag включён, поэтому проверка обычно стоит один 304 без тела. */
+    res.setHeader('Cache-Control', 'no-cache')
     res.status(status).sendFile(join(DIST, 'index.html'))
   })
 }
