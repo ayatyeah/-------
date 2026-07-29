@@ -38,9 +38,17 @@ fi
 # которой давно вышло обновление. Раз машина без администратора, обновления
 # безопасности должны ставиться сами.
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get upgrade -y -qq
-apt-get install -y -qq unattended-upgrades ufw fail2ban curl
+# needrestart без TTY пытается показать диалог и вешает установку намертво
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
+apt-get update -q
+# --force-confold: не спрашивать про изменённые конфиги, оставлять текущие
+apt-get -y -q \
+  -o Dpkg::Options::="--force-confold" \
+  -o Dpkg::Options::="--force-confdef" \
+  upgrade
+apt-get install -y -q unattended-upgrades ufw fail2ban curl
 
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
 APT::Periodic::Update-Package-Lists "1";
