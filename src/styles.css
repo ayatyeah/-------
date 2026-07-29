@@ -689,6 +689,10 @@ h4 {
 .stat {
   padding: 26px 20px;
   border-left: 1px solid var(--rule-dark);
+  /* Колонка 1fr = minmax(auto, 1fr): без этого длинное значение из админки
+     (см. ниже, «длинные значения из админки») не даёт колонке сжаться,
+     раздувая весь ряд показателей. */
+  min-width: 0;
 }
 
 .stat:first-child {
@@ -709,6 +713,37 @@ h4 {
   letter-spacing: 0.04em;
   color: var(--on-dark-2);
   margin-top: 6px;
+}
+
+/**
+ * Длинные значения из админки (показатели, услуги, каталог, новости,
+ * сертификаты, категории, фильтр каталога).
+ *
+ * `overflow-wrap: break-word` рвёт строку только на этапе раскладки, когда
+ * место уже определено, — на min-content (минимальную ширину, которую грид
+ * закладывает под колонку) он не влияет. Слово всё равно не помещалось бы
+ * без переноса, и колонка раздувалась бы под него, утаскивая за собой всю
+ * сетку — вплоть до соседних, ни в чём не виноватых карточек.
+ * `overflow-wrap: anywhere` — единственное из двух, что учитывается при
+ * расчёте min-content, поэтому только оно чинит раздутие по-настоящему.
+ * Первая строка — запасной вариант для браузеров без anywhere.
+ */
+.stat-v,
+.stat-k,
+.svc h3,
+.svc p,
+.svc-note,
+.card-title,
+.cert-title,
+.cert-org,
+.wwd-cat-name,
+.filter,
+.specs td,
+.table td,
+.model-title,
+.article-title {
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* -------------------------------- карточки ------------------------------ */
@@ -733,6 +768,9 @@ h4 {
   border: 1px solid var(--rule);
   transition: border-color 0.2s var(--ease), transform 0.2s var(--ease),
     box-shadow 0.2s var(--ease);
+  /* .grid-2 — repeat(N, 1fr): без этого длинное название модели/новости
+     раздувает колонку целиком, утаскивая соседние карточки за экран. */
+  min-width: 0;
 }
 
 .card--link {
@@ -891,6 +929,9 @@ h4 {
   cursor: pointer;
   transition: border-color 0.2s var(--ease), transform 0.2s var(--ease),
     box-shadow 0.2s var(--ease);
+  /* .cert-grid — repeat(3, 1fr): без этого длинное название документа
+     раздувает саму карточку (в разы шире остальных), а не переносится. */
+  min-width: 0;
 }
 
 .cert:hover {
@@ -2163,6 +2204,11 @@ select.input {
   overflow: hidden;
   transition: border-color 0.22s var(--ease), transform 0.22s var(--ease),
     box-shadow 0.22s var(--ease);
+  /* Грид-элемент по умолчанию не сжимается уже своего min-content — без
+     этого длинный заголовок раздувает всю колонку .svc-grid, а не только
+     себя (карточка своим overflow: hidden тут не спасает: он клипует
+     содержимое ПОСЛЕ того, как колонка уже выросла под него). */
+  min-width: 0;
 }
 
 /* Латунная полоса растёт сверху вниз по левому краю. */
@@ -2662,6 +2708,9 @@ select.input {
   border-radius: var(--r-sm);
   color: var(--on-dark);
   transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
+  /* .wwd-cats — grid-template-columns: 1fr 1fr: без этого длинное название
+     категории раздувает всю колонку целиком. */
+  min-width: 0;
 }
 
 .wwd-cat:hover {
