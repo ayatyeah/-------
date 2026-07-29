@@ -9,7 +9,6 @@
  * Сервер и без неё поднимется: при первом старте store.json создастся сам.
  */
 import * as store from './store.js'
-import * as seed from './seed.js'
 
 console.log('→ Файл данных:', store.STORE_PATH)
 
@@ -29,10 +28,15 @@ console.log('\n✓ Готово. Запустите: npm run dev:server  и  npm
 // Сервер держит данные в памяти, поэтому на уже запущенный он не посмотрит.
 console.log('  Если сервер сейчас запущен — перезапустите его, иначе увидите старые данные.')
 
-const pw = process.env.ADMIN_PASSWORD || seed.settings.admin_password
-console.log(`  Вход в админку — пароль: ${pw}`)
-if (pw === 'admin') {
-  console.log('  ⚠ Пароль стандартный. Перед публикацией смените ADMIN_PASSWORD в .env')
+// Пароль больше не хранится в seed — только в .env (см. server/index.js).
+const pw = process.env.ADMIN_PASSWORD
+if (pw) {
+  console.log(`  Вход в админку — пароль: ${pw}`)
+  if (pw === 'admin') {
+    console.log('  ⚠ Пароль стандартный. Перед публикацией смените ADMIN_PASSWORD в .env')
+  }
+} else {
+  console.log('  ⚠ ADMIN_PASSWORD не задан в .env — вход в админку не сработает.')
 }
 
 if (process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY) {

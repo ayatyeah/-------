@@ -300,6 +300,13 @@ function migrate(raw) {
   // Настройки дополняем недостающими ключами, не затирая заданные.
   d.settings = { ...base.settings, ...(raw.settings || {}) }
 
+  /* Пароль в настройках — наследие от версии без хэширования. Он попадал в
+     store.json открытым текстом, а оттуда — в автоматические копии на диске
+     (ручная выгрузка и публичный API его вырезали, а backup.sh копирует файл
+     целиком). Сейчас пароль хранится scrypt-хэшем в d.auth, и это поле мёртвое.
+     Удаляем при первой же загрузке. */
+  delete d.settings.admin_password
+
   if (!Array.isArray(d.regions) || d.regions.length === 0) d.regions = [...base.regions]
   if (!Array.isArray(d.media)) d.media = []
   if (!d.auth || typeof d.auth !== 'object') d.auth = {}
@@ -340,7 +347,16 @@ export function load() {
   }
 
   try {
-    data = migrate(JSON.parse(readFileSync(STORE_PATH, 'utf8')))
+    const raw = JSON.parse(readFileSync(STORE_PATH, 'utf8'))
+    const hadLegacyPassword = raw?.settings?.admin_password !== undefined
+    data = migrate(raw)
+    /* Миграция чистит поле только в памяти. Если на диске оно ещё лежало,
+       сохраняем сразу: иначе файл ждал бы первой правки в админке или
+       ближайшего автосохранения, а оно срабатывает раз в минуту и только
+       когда что-то само пометило данные изменёнными — то есть могло не
+       сработать вовсе. Копия, снятая в этом окне, унесла бы старое
+       значение с собой ровно из-за того пути, который и чиним. */
+    if (hadLegacyPassword) saveNow()
     return { seeded: false }
   } catch (e) {
     console.error('store.json не читается:', e.message)
