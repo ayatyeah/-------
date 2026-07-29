@@ -396,12 +396,21 @@ echo "=== 3.6. Форма заявки ==="
 # ============================================================================
 check "без согласия → отклонено" 400 "$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' -d '{"type":"call","fio":"ZZTEST Тест","phone":"+7 700 000 00 00","consent":false}')"
 
-TRAP_CODE=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
+TRAP_RESP=$(curl -s -w "\nHTTPSTATUS:%{http_code}" -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
   -d '{"type":"call","fio":"ZZTEST Бот","phone":"+7 700 000 00 00","consent":true,"website":"http://spam.example"}')
+TRAP_CODE=$(echo "$TRAP_RESP" | grep -o 'HTTPSTATUS:[0-9]*' | cut -d: -f2)
 if [ "$TRAP_CODE" = "201" ]; then
-  # проверяем, что заявка НЕ сохранилась
+  # Показали 201 боту (ожидаемо — ловушка не должна себя выдавать), но
+  # если заявка при этом реально сохранилась, это баг: запоминаем id на
+  # случай такого провала, чтобы запись не осталась в базе навсегда.
+  TRAP_ID=$(echo "$TRAP_RESP" | sed 's/HTTPSTATUS:[0-9]*$//' | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
   HIT=$(body "$BASE/api/requests" "${AUTH[@]}" | grep -c 'ZZTEST Бот' || true)
-  if [ "$HIT" = "0" ]; then ok "ловушка для ботов: 201 показан боту, но заявка не сохранена"; else bad "ловушка для ботов не сработала" "не сохранено" "сохранено"; fi
+  if [ "$HIT" = "0" ]; then
+    ok "ловушка для ботов: 201 показан боту, но заявка не сохранена"
+  else
+    bad "ловушка для ботов не сработала" "не сохранено" "сохранено"
+    [ -n "$TRAP_ID" ] && CREATED_REQUESTS+=("$TRAP_ID")
+  fi
 else
   check "заполненная ловушка для ботов → отклонено" 400 "$TRAP_CODE"
 fi
@@ -409,7 +418,15 @@ fi
 check "телефон из букв → отклонено" 400 "$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' -d '{"type":"call","fio":"ZZTEST Тест","phone":"абвгд","consent":true}')"
 
 LONGFIO=$(python3 -c "print('И'*10000)")
-FIO_CODE=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' -d "{\"type\":\"call\",\"fio\":\"$LONGFIO\",\"phone\":\"+7 700 000 00 01\",\"consent\":true}")
+LONGFIO_RESP=$(curl -s -w "\nHTTPSTATUS:%{http_code}" -X POST "$BASE/api/requests" -H 'Content-Type: application/json' -d "{\"type\":\"call\",\"fio\":\"$LONGFIO\",\"phone\":\"+7 700 000 00 01\",\"consent\":true}")
+FIO_CODE=$(echo "$LONGFIO_RESP" | grep -o 'HTTPSTATUS:[0-9]*' | cut -d: -f2)
+# 201 — заявка реально создалась (даже если ФИО обрезано) — запоминаем id,
+# иначе она останется в базе навсегда: status() выше отдавал только код,
+# id терялся, и на боевом это оставило забытую запись после первого прогона.
+if [ "$FIO_CODE" = "201" ]; then
+  LONGFIO_ID=$(echo "$LONGFIO_RESP" | sed 's/HTTPSTATUS:[0-9]*$//' | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+  [ -n "$LONGFIO_ID" ] && CREATED_REQUESTS+=("$LONGFIO_ID")
+fi
 case "$FIO_CODE" in 201|400) ok "ФИО в 10000 символов → $FIO_CODE (обрезано или отклонено), сервер жив" ;; *) bad "ФИО 10000 символов" "201 или 400" "$FIO_CODE" ;; esac
 check "сервер жив после длинного ФИО" 200 "$(status "$BASE/api/health")"
 
@@ -421,8 +438,13 @@ if [ "${SKIP_LOCKOUT_TESTS:-0}" = "1" ]; then
 else
   RATE_HIT=no
   for i in $(seq 1 8); do
-    C=$(status -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
+    RESP=$(curl -s -w "\nHTTPSTATUS:%{http_code}" -X POST "$BASE/api/requests" -H 'Content-Type: application/json' \
       -d "{\"type\":\"call\",\"fio\":\"ZZTEST Лимит $i\",\"phone\":\"+7 700 000 00 0$i\",\"consent\":true}")
+    C=$(echo "$RESP" | grep -o 'HTTPSTATUS:[0-9]*' | cut -d: -f2)
+    if [ "$C" = "201" ]; then
+      RID=$(echo "$RESP" | sed 's/HTTPSTATUS:[0-9]*$//' | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+      [ -n "$RID" ] && CREATED_REQUESTS+=("$RID")
+    fi
     if [ "$C" = "429" ]; then RATE_HIT=yes; break; fi
   done
   if [ "$RATE_HIT" = "yes" ]; then ok "лимит частоты на заявки сработал (лимит 5/10мин)"; else bad "лимит частоты на заявки" "429 после 5-й" "не сработал за 8 попыток"; fi
