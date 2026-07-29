@@ -2,12 +2,8 @@ import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { PRIVACY_VERSION } from '../../shared/constants.js'
 
-/* Редакция документа. Держится в паре с PRIVACY_VERSION в server/index.js:
-   сервер записывает эту дату в каждую заявку рядом с временем согласия,
-   чтобы было видно, с какой версией текста человек согласился.
-   Меняете текст — поднимите дату в обоих местах. */
-export const PRIVACY_VERSION = '2026-07-24'
 const PRIVACY_DATE = '24 июля 2026 года'
 
 /**
@@ -36,7 +32,7 @@ export default function Privacy() {
       </div>
 
       <div className="wrap doc" style={{ paddingBottom: 80 }}>
-        <Reveal as="p" className="doc-meta">
+        <Reveal as="p" className="doc-meta" title={`Редакция ${PRIVACY_VERSION}`}>
           Редакция от {PRIVACY_DATE}
         </Reveal>
 

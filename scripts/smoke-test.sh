@@ -160,6 +160,16 @@ NEWS_HIT=$(body "$BASE/api/news" | grep -c "ZZTEST-Черновик новост
 check "неопубликованной новости нет в /api/news" "0" "$NEWS_HIT"
 
 check "прямой GET /api/models/<черновик> без токена → 404" 404 "$(status "$BASE/api/models/$DRAFT_ID")"
+check "прямой GET /api/news/<черновик> без токена → 404" 404 "$(status "$BASE/api/news/$DRAFT_NEWS_ID")"
+check "то же с токеном → 200 (админ черновик видит)" 200 "$(status "$BASE/api/models/$DRAFT_ID" "${AUTH[@]}")"
+
+# Переполнение квоты на картинки (507, а не 500) требует отдельного стенда с
+# низким UPLOAD_QUOTA_MB — против уже запущенного произвольного сервера этот
+# скрипт квоту не понизит. Проверка руками:
+#   UPLOAD_QUOTA_MB=1 ADMIN_PASSWORD=testpass12345 NODE_ENV=production \
+#     PORT=3005 STORE_PATH=.../store.json UPLOAD_DIR=.../uploads node server/index.js
+#   затем залить фото до превышения 1 МБ — ответ должен быть 507 с текстом
+#   про освобождение места, и НЕ должно быть "API error" в логе сервера.
 
 # ============================================================================
 echo

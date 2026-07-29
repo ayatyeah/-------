@@ -17,6 +17,7 @@ import * as store from './store.js'
 import * as ai from './ai.js'
 import * as uploads from './uploads.js'
 import { notifyNewRequest } from './notify.js'
+import { PRIVACY_VERSION } from '../shared/constants.js'
 
 const { seeded, recovered } = store.load()
 
@@ -243,12 +244,10 @@ app.use('/api', limitGlobal)
 
 /* ------------------------------- утилиты ------------------------------- */
 
-/* Редакция политики конфиденциальности. Записывается в каждую заявку рядом
-   с временем согласия, чтобы потом было видно, с какой именно версией текста
-   человек согласился.
-   Меняете текст политики — поднимите дату и здесь, и в src/pages/Privacy.jsx
-   (константа PRIVACY_VERSION там же). */
-const PRIVACY_VERSION = '2026-07-24'
+/* Редакция политики конфиденциальности — общая с фронтендом, см.
+   shared/constants.js. Записывается в каждую заявку рядом с временем
+   согласия, чтобы потом было видно, с какой именно версией текста человек
+   согласился. */
 
 /** Обрезает строку по длине и убирает управляющие символы. */
 const clean = (v, max) =>
@@ -371,11 +370,17 @@ const requireAdmin = (req, res, next) => {
  *  ошибка превращалась в безликую 500, и в админке было непонятно, что
  *  именно не так. Всё, у чего status нет, — это уже настоящий сбой:
  *  в лог подробности, наружу общая формулировка. */
+/* Статусы, которые код бросает осознанно, с человеческим текстом. Перечень
+   явный, а не диапазон: показывать наружу message любой ошибки с полем status
+   рискованно — так можно случайно отдать текст из чужой библиотеки. 507 —
+   переполнение квоты на картинки, это ожидаемое состояние, а не сбой. */
+const ОЖИДАЕМЫЕ_СТАТУСЫ = new Set([400, 401, 403, 404, 409, 413, 415, 429, 507])
+
 const wrap = (fn) => async (req, res) => {
   try {
     await fn(req, res)
   } catch (e) {
-    if (e?.status && e.status >= 400 && e.status < 500) {
+    if (e?.status && ОЖИДАЕМЫЕ_СТАТУСЫ.has(e.status)) {
       if (!res.headersSent) res.status(e.status).json({ error: e.message })
       return
     }
@@ -578,6 +583,13 @@ app.get('/api/models', wrap((req, res) => {
 app.get('/api/models/:id', wrap((req, res) => {
   const m = store.models.get(req.params.id)
   if (!m) return res.status(404).json({ error: 'Модель не найдена' })
+  /* Черновик виден только администратору. Отдаём именно 404, а не 403:
+     403 подтвердил бы, что запись существует, — постороннему знать об этом
+     незачем. Списочные эндпоинты фильтруют по published, и одиночные должны
+     вести себя так же. */
+  if (!m.published && !isAdmin(req)) {
+    return res.status(404).json({ error: 'Модель не найдена' })
+  }
   res.json(m)
 }))
 
@@ -629,6 +641,9 @@ app.get('/api/news', wrap((req, res) => {
 app.get('/api/news/:id', wrap((req, res) => {
   const n = store.news.get(req.params.id)
   if (!n) return res.status(404).json({ error: 'Статья не найдена' })
+  if (!n.published && !isAdmin(req)) {
+    return res.status(404).json({ error: 'Статья не найдена' })
+  }
   res.json(n)
 }))
 

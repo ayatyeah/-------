@@ -46,6 +46,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY server ./server
+COPY shared ./shared
 COPY --from=build /app/dist ./dist
 
 # Данные и загруженные фотографии лежат на томе. Каталоги создаём заранее и
