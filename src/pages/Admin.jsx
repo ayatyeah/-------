@@ -911,7 +911,13 @@ export default function Admin() {
               type="button"
               key={t.id}
               className={`admin-tab${tab === t.id ? ' active' : ''}`}
-              onClick={() => setTab(t.id)}
+              onClick={(e) => {
+                setTab(t.id)
+                // На телефоне лента вкладок шире экрана — без этого выбранная
+                // вкладка могла остаться за тающим краем, и было не видно,
+                // куда на самом деле переключились.
+                e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+              }}
             >
               {t.name}
               {t.id === 'requests' && newCount > 0 && (
