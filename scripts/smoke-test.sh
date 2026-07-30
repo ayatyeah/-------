@@ -206,6 +206,17 @@ open('$TMP_PY/empty','wb').write(b'')
 open('$TMP_PY/big','wb').write(b'\xff\xd8\xff\xe0'+b'A'*(9*1024*1024))
 open('$TMP_PY/svg.svg','wb').write(b'<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>')
 open('$TMP_PY/polyglot.gif','wb').write(b'GIF89a'+b'<html><script>alert(1)</script></html>')
+# Настоящий JPEG с XMP-метаданными, где встречается '<svg:width>' — ровно
+# та строка, из-за которой прежний шаблон '<svg' отклонял снимки из
+# Illustrator/Figma (см. Правку 1). Должен приниматься.
+open('$TMP_PY/xmp.jpg','wb').write(
+    bytes([0xFF,0xD8,0xFF,0xE0]) + b'\x00'*20 +
+    b'<x:xmpmeta><rdf:RDF><rdf:Description><svg:width>800</svg:width>' +
+    b'</rdf:Description></rdf:RDF></x:xmpmeta>' + b'\x00'*50
+)
+# Полиглот без обёртки '<html>' — проверяет именно шаблон '<script' сам по
+# себе, не полагаясь на соседний '<html>'.
+open('$TMP_PY/polyglot2.gif','wb').write(b'GIF89a'+b'<script>alert(1)</script>')
 "
 
 up() { # up <файл> <X-File-Name> — только код ответа, файл не отслеживается
@@ -243,6 +254,12 @@ check "настоящий JPEG → 201" 201 "$CODE2"
 
 check "SVG со <script> → 415" 415 "$(up "$TMP/svg.svg" 'ZZTEST-x.svg')"
 check "GIF89a + HTML внутри (полиглот) → 415" 415 "$(up "$TMP/polyglot.gif" 'ZZTEST-x.gif')"
+check "чистый полиглот GIF89a + <script> (без <html>) → 415" 415 "$(up "$TMP/polyglot2.gif" 'ZZTEST-x2.gif')"
+
+IFS=$'\t' read -r CODE3 NAME3 <<< "$(up_tracked "$TMP/xmp.jpg" 'ZZTEST-xmp.jpg')"
+[ -n "$NAME3" ] && CREATED_UPLOADS+=("$NAME3")
+check "JPEG с XMP-фрагментом <svg:width> (как из Illustrator/Figma) → 201" 201 "$CODE3"
+
 check "JSON с именем .jpeg → 415" 415 "$(up "$TMP/fake.json" 'ZZTEST-x.jpeg')"
 check "ELF-заголовок → 415" 415 "$(up "$TMP/elf" 'ZZTEST-x.png')"
 check "пустое тело → 400" 400 "$(up "$TMP/empty" 'ZZTEST-x.png')"
@@ -267,6 +284,27 @@ if [ -n "$NAME1" ]; then
   case "$CT" in *image/png*) ok "отдача файла: верный Content-Type" ;; *) bad "Content-Type картинки" "image/png" "$CT" ;; esac
   check "отдача файла: nosniff" 1 "$NS"
   case "$CD" in *inline*) ok "отдача файла: Content-Disposition inline" ;; *) bad "Content-Disposition" "inline" "$CD" ;; esac
+fi
+
+# Файл на диске без записи в описи (см. Правку 2) — GET /api/uploads должен
+# показать его как обычный, а не молчать о нём. Кладём файл напрямую в
+# каталог загрузок сервера, минуя API, — поэтому нужен прямой доступ к
+# файловой системе сервера, а он есть только когда тест и сервер на одной
+# машине (например, локальный стенд, поднятый по промпту «полное
+# тестирование» с явным UPLOAD_DIR). На бою по HTTPS такого доступа нет —
+# проверка тогда пропускается, а не проваливается.
+if [ -n "${UPLOAD_DIR:-}" ] && [ -d "$UPLOAD_DIR" ]; then
+  ORPHAN_NAME="ZZTEST-orphan-$$.jpg"
+  cp "$TMP/real.jpg" "$UPLOAD_DIR/$ORPHAN_NAME"
+  ORPHAN_HIT=$(body "$BASE/api/uploads" "${AUTH[@]}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(sum(1 for f in d.get('files',[]) if f.get('name')=='$ORPHAN_NAME'))
+" 2>/dev/null)
+  check "файл на диске без записи в описи виден в GET /api/uploads" "1" "${ORPHAN_HIT:-0}"
+  CREATED_UPLOADS+=("$ORPHAN_NAME")
+else
+  echo "    (пропущено: UPLOAD_DIR не задан или недоступен — нет прямого доступа к каталогу загрузок сервера, естественно при прогоне по HTTPS на бою)"
 fi
 
 # $TMP используется ещё в разделе 3.4 (тела запросов из файла) — удаляем

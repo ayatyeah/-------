@@ -763,9 +763,33 @@ app.put('/api/settings', requireAdmin, limitAdminWrite, wrap((req, res) => {
  * `usedBy` — список карточек, где картинка стоит: удалять фото из-под
  * живой модели, ничего об этом не сказав, — верный способ получить
  * каталог с дырами вместо снимков.
+ *
+ * Опись (store.media) и диск (uploads.listFiles()) здесь всегда сверяются,
+ * а не читаются по отдельности: раньше опись обрезалась на 400 записях, а
+ * файлы оставались на диске — занимали квоту, но были не видны и не
+ * удаляемы через админку. Теперь наоборот — опись вообще не обрезается, а
+ * расхождения (файл есть, записи нет — например, после восстановления из
+ * бэкапа; запись есть, файла нет — удалили руками с сервера) разбираются
+ * здесь: файл без записи показываем как обычный, запись без файла —
+ * молча пропускаем, чтобы не рисовать битую картинку.
  */
 app.get('/api/uploads', requireAdmin, wrap((_req, res) => {
-  const list = store.media.all().map((m) => ({ ...m, usedBy: store.media.usedBy(m.path) }))
+  const onDisk = new Map(uploads.listFiles().map((f) => [f.name, f]))
+  const seen = new Set()
+  const list = []
+
+  for (const m of store.media.all()) {
+    const disk = onDisk.get(m.name)
+    if (!disk) continue
+    seen.add(m.name)
+    list.push({ ...m, usedBy: store.media.usedBy(m.path) })
+  }
+  for (const f of onDisk.values()) {
+    if (seen.has(f.name)) continue
+    list.push({ ...f, title: '', usedBy: store.media.usedBy(f.path) })
+  }
+  list.sort((a, b) => (a.at < b.at ? 1 : -1))
+
   res.json({
     files: list,
     usedBytes: uploads.usedBytes(),
