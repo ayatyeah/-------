@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useT } from '../i18n'
 
 /*
  * Баннер согласия на использование данных в браузере.
@@ -41,6 +42,7 @@ function save(analytics) {
 }
 
 export default function CookieConsent() {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -61,13 +63,13 @@ export default function CookieConsent() {
   }
 
   return (
-    <div className="cookie" role="dialog" aria-label="Использование данных" aria-live="polite">
+    <div className="cookie" role="dialog" aria-label={t('cookie_aria')} aria-live="polite">
       <div className="cookie-inner">
         <div className="cookie-text">
-          <b>Данные в браузере.</b> Сайт использует только необходимое для работы
-          хранилище и не ведёт рекламной или аналитической слежки.{' '}
+          <b>{t('cookie_b')}</b>
+          {t('cookie_text')}
           <Link to="/privacy" target="_blank" rel="noopener noreferrer">
-            Политика конфиденциальности
+            {t('cookie_privacy')}
           </Link>
           .
         </div>
@@ -75,10 +77,10 @@ export default function CookieConsent() {
           {/* Обе кнопки сейчас делают одно и то же (слежки нет). «Только
               необходимые» останется рабочим отказом, когда добавят аналитику. */}
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => decide(false)}>
-            Только необходимые
+            {t('cookie_necessary')}
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => decide(true)}>
-            Принять
+            {t('cookie_accept')}
           </button>
         </div>
       </div>

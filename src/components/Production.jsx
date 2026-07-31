@@ -1,26 +1,16 @@
 import Reveal from './Reveal'
 import Icon from './Icon'
+import { useT } from '../i18n'
 
 /* Три этапа — ровно те, что заявлены в тексте о компании: «льём узлы,
    собираем, красим и обкатываем на своём полигоне». Раньше здесь стояли
    пустые плашки под фото цеха; фотографий нет до сих пор, поэтому главную
    мысль — делаем сами — держит текст, а не картинка. */
+/* t/p — ключи словаря (src/locales/*): stage_1t..stage_3p. */
 const STAGES = [
-  {
-    icon: 'factory',
-    t: 'Сборочный цех',
-    p: 'Льём и обрабатываем узлы, собираем машину целиком. Ключевые детали делаем у себя, а не заказываем на стороне.',
-  },
-  {
-    icon: 'shield',
-    t: 'Линия покраски',
-    p: 'Грунт и эмаль — защита от степной пыли, влаги и перепадов от −40 до +40.',
-  },
-  {
-    icon: 'compass',
-    t: 'Испытательный полигон',
-    p: 'Каждая машина проходит обкатку до отгрузки. Слабое место находим мы, а не хозяйство в разгар уборки.',
-  },
+  { icon: 'factory', t: 'stage_1t', p: 'stage_1p' },
+  { icon: 'shield', t: 'stage_2t', p: 'stage_2p' },
+  { icon: 'compass', t: 'stage_3t', p: 'stage_3p' },
 ]
 
 /**
@@ -36,20 +26,20 @@ const STAGES = [
  *   повествования, и цитата там перебивала бы её.
  */
 export default function Production({ quote = false }) {
+  const { t } = useT()
   return (
     <section className="band band--dark" id="production">
       <div className="wrap">
         <Reveal as="span" className="kicker kicker--light">
-          Собственное производство
+          {t('prod_kicker')}
         </Reveal>
         <div className="section-head">
           <div>
             <Reveal as="h2" delay={60}>
-              Цех, а не перепродажа
+              {t('prod_title')}
             </Reveal>
             <Reveal as="p" className="lead" delay={120} style={{ marginTop: 12 }}>
-              Машину не привозят готовой из-за границы с нашей наклейкой. Её здесь собирают,
-              красят и обкатывают — и за неё же здесь отвечают.
+              {t('prod_lead')}
             </Reveal>
           </div>
         </div>
@@ -60,20 +50,17 @@ export default function Production({ quote = false }) {
               <span className="prod-stage-icon">
                 <Icon name={s.icon} size={24} />
               </span>
-              <span className="prod-stage-num">Этап {String(i + 1).padStart(2, '0')}</span>
-              <h3>{s.t}</h3>
-              <p>{s.p}</p>
+              <span className="prod-stage-num">{t('prod_stage')} {String(i + 1).padStart(2, '0')}</span>
+              <h3>{t(s.t)}</h3>
+              <p>{t(s.p)}</p>
             </Reveal>
           ))}
         </div>
 
         {quote && (
           <Reveal className="pullquote pullquote--bare" delay={160}>
-            <p>
-              Мы не продаём технику, которая не нужна. Если хозяйству хватит машины проще —
-              скажем прямо: репутация дороже одной сделки.
-            </p>
-            <div className="pullquote-by">Ерлан Абдразаков, директор по продажам</div>
+            <p>{t('prod_quote')}</p>
+            <div className="pullquote-by">{t('prod_quote_by')}</div>
           </Reveal>
         )}
       </div>

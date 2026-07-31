@@ -1,51 +1,37 @@
 import Reveal from './Reveal'
+import { useT } from '../i18n'
 
 /**
  * «Как мы работаем» — путь от заявки до сервиса.
  * Номера шагов рисует CSS-счётчик, в разметке их нет.
+ * Тексты — в словарях (src/locales), ключи step_Nt / step_Np.
  */
-const STEPS = [
-  {
-    t: 'Заявка',
-    p: 'Звоните или оставляете номер. Спросим о главном: сколько гектаров, какие культуры и к какому сроку нужна машина.',
-  },
-  {
-    t: 'Подбор и КП',
-    p: 'Предлагаем одну-две модели и присылаем предложение с ценой, комплектацией и сроком поставки. Без «звоните, обсудим».',
-  },
-  {
-    t: 'Лизинг и субсидия',
-    p: 'Проверяем, попадает ли модель под господдержку, считаем платёж и помогаем собрать документы.',
-  },
-  {
-    t: 'Поставка и сервис',
-    p: 'Доставляем в хозяйство, запускаем, обучаем механизатора. Дальше — ТО, запчасти и выезд бригады в поле.',
-  },
-]
+const STEPS = [1, 2, 3, 4]
 
 export default function Steps() {
+  const { t } = useT()
   return (
     <section className="section">
       <div className="wrap">
         <Reveal as="span" className="kicker">
-          Как мы работаем
+          {t('steps_kicker')}
         </Reveal>
         <div className="section-head">
           <div>
             <Reveal as="h2" delay={60}>
-              Четыре шага от звонка до поля
+              {t('steps_title')}
             </Reveal>
             <Reveal as="p" className="lead" delay={120} style={{ marginTop: 12 }}>
-              Никаких скрытых этапов: вы заранее знаете цену, срок и размер платежа.
+              {t('steps_lead')}
             </Reveal>
           </div>
         </div>
 
         <div className="steps">
-          {STEPS.map((s, i) => (
-            <Reveal className="step" key={s.t} delay={i * 100}>
-              <h3>{s.t}</h3>
-              <p>{s.p}</p>
+          {STEPS.map((n, i) => (
+            <Reveal className="step" key={n} delay={i * 100}>
+              <h3>{t(`step_${n}t`)}</h3>
+              <p>{t(`step_${n}p`)}</p>
             </Reveal>
           ))}
         </div>

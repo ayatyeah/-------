@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { useT } from '../i18n'
 
 /** Плашка вместо фотографии — штриховка с подписью. */
 export function MediaStub({ label }) {
@@ -62,17 +63,18 @@ export function Loading({ count = 3 }) {
 }
 
 export function ErrorState({ message, onRetry }) {
+  const { t } = useT()
   return (
     <div className="state">
-      <div className="state-title">Не удалось загрузить</div>
+      <div className="state-title">{t('err_title')}</div>
       <p style={{ marginBottom: 18 }}>
         {message}
         <br />
-        Проверьте, запущен ли сервер: <code>npm run dev:server</code>
+        {t('err_hint')} <code>npm run dev:server</code>
       </p>
       {onRetry && (
         <button type="button" className="btn btn-secondary" onClick={onRetry}>
-          Повторить
+          {t('retry')}
         </button>
       )}
     </div>
@@ -98,9 +100,10 @@ export function EmptyState({ title, text }) {
  * и не подставил живого человека под ложное срабатывание.
  */
 export function Honeypot({ name }) {
+  const { t } = useT()
   return (
     <div className="hp" aria-hidden="true">
-      <label htmlFor={name}>Не заполняйте это поле</label>
+      <label htmlFor={name}>{t('honeypot')}</label>
       <input id={name} name={name} type="text" tabIndex={-1} autoComplete="off" />
     </div>
   )
@@ -118,6 +121,7 @@ export function Honeypot({ name }) {
  * согласия не создать.
  */
 export function ConsentCheck({ checked, onChange, id }) {
+  const { t } = useT()
   return (
     <label className="consent" htmlFor={id}>
       <input
@@ -128,11 +132,11 @@ export function ConsentCheck({ checked, onChange, id }) {
         required
       />
       <span>
-        Я согласен на обработку моих персональных данных и ознакомлен с{' '}
+        {t('consent_pre')}
         <Link to="/privacy" target="_blank" rel="noopener noreferrer">
-          политикой конфиденциальности
+          {t('consent_link')}
         </Link>
-        .
+        {t('consent_post')}
       </span>
     </label>
   )

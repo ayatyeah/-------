@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
-import { api, formatDate } from '../api'
+import { api } from '../api'
 import { useFetch } from '../store'
 import { Media, Loading, ErrorState, EmptyState } from '../components/ui'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
 export default function News() {
   usePageMeta({
@@ -11,16 +12,17 @@ export default function News() {
     description:
       'Новости завода СХМ Агро, обновления модельного ряда сельхозтехники, разборы по субсидиям и лизингу для аграриев Казахстана.',
   })
+  const { t, fdate } = useT()
   const { data, loading, error, reload } = useFetch(() => api.news(), [])
   const items = data ?? []
 
   return (
     <main className="route-fade">
       <div className="wrap page-head">
-        <span className="kicker">Пресс-центр</span>
-        <h1>Новости и статьи</h1>
+        <span className="kicker">{t('press_kicker')}</span>
+        <h1>{t('news_page_title')}</h1>
         <p className="lead" style={{ marginTop: 14 }}>
-          Что происходит на производстве, как меняется техника и как получить господдержку.
+          {t('news_lead')}
         </p>
       </div>
 
@@ -29,7 +31,7 @@ export default function News() {
         {error && <ErrorState message={error} onRetry={reload} />}
 
         {!loading && !error && items.length === 0 && (
-          <EmptyState title="Новостей пока нет" text="Загляните позже." />
+          <EmptyState title={t('news_empty_t')} text={t('news_empty_p')} />
         )}
 
         {items.length > 0 && (
@@ -40,14 +42,14 @@ export default function News() {
                     поисковику. Раньше открывалась только onClick. */}
                 <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
-                    <Media src={n.cover} alt={n.title} stub="Обложка" />
+                    <Media src={n.cover} alt={n.title} stub={t('cover_stub')} />
                   </div>
                   <div className="card-body">
-                    <span className="card-meta">{formatDate(n.date)}</span>
+                    <span className="card-meta">{fdate(n.date)}</span>
                     <h3 className="card-title">{n.title}</h3>
                     <p className="card-text">{n.excerpt}</p>
                     <span className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>
-                      Читать →
+                      {t('read')}
                     </span>
                   </div>
                 </Link>

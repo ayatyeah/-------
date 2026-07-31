@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
 /* Редакция документа — в паре с датой в подвале. */
 const TERMS_DATE = '24 июля 2026 года'
@@ -15,6 +16,7 @@ const TERMS_DATE = '24 июля 2026 года'
  * онлайн-оплату.
  */
 export default function Terms() {
+  const { lang, t } = useT()
   usePageMeta({
     title: 'Условия использования',
     description: 'На каких условиях работает сайт ТОО «СХМ Агро».',
@@ -25,7 +27,7 @@ export default function Terms() {
   return (
     <main className="route-fade">
       <div className="wrap page-head">
-        <span className="kicker">Документы</span>
+        <span className="kicker">{t('docs_kicker')}</span>
         <h1>Условия использования</h1>
         <p className="lead" style={{ marginTop: 12 }}>
           На каких условиях работает сайт {company} и что он вам предлагает.
@@ -33,6 +35,9 @@ export default function Terms() {
       </div>
 
       <div className="wrap doc" style={{ paddingBottom: 80 }}>
+        {/* Юридический текст ведём на одном языке: перевод политики — это
+            юридическая работа, машинный перевод здесь опаснее его отсутствия. */}
+        {lang !== 'ru' && <p className="doc-meta">{t('legal_note')}</p>}
         <Reveal as="p" className="doc-meta">
           Редакция от {TERMS_DATE}
         </Reveal>

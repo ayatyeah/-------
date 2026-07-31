@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { useT } from '../i18n'
 
 /**
  * Бегущая строка регионов присутствия — чистый CSS-keyframes.
  * Лента дублируется, поэтому прокрутка на -50% выглядит бесшовной.
  */
 export default function Ticker() {
+  const { t, td } = useT()
   const [regions, setRegions] = useState([])
 
   useEffect(() => {
@@ -21,12 +23,12 @@ export default function Ticker() {
 
   return (
     <div className="ticker" aria-hidden="true">
-      <div className="ticker-label">Сервис и дилеры</div>
+      <div className="ticker-label">{t('ticker_label')}</div>
       <div className="ticker-mask">
         <div className="ticker-lane">
           {lane.map((r, i) => (
             <span className="ticker-item" key={i}>
-              {r}
+              {td(r)}
               <i className="ticker-dot" />
             </span>
           ))}

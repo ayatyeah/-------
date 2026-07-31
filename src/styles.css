@@ -4531,3 +4531,39 @@ select.input {
     align-items: flex-start;
   }
 }
+
+/* ------------------------- переключатель языка ------------------------- */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper, #fff) 60%, transparent);
+}
+.lang-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.lang-btn:hover { color: var(--text); }
+.lang-btn.active {
+  background: var(--green-600, #2c5f2d);
+  color: #fff;
+}
+/* В мобильном меню — во всю ширину, повыше кнопки */
+.lang-switch--block {
+  display: flex;
+  width: 100%;
+  margin-top: 12px;
+}
+.lang-switch--block .lang-btn { flex: 1; padding-block: 9px; }

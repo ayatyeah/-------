@@ -5,6 +5,7 @@ import Reveal from '../components/Reveal'
 import { ConsentCheck, Honeypot } from '../components/ui'
 import Icon from '../components/Icon'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
 const SOCIAL = [
   { key: 'instagram_url', name: 'Instagram' },
@@ -19,6 +20,7 @@ export default function Contacts() {
       'Адрес, телефон и почта ТОО «СХМ Агро» — купить сельхозтехнику в Казахстане. Оставьте заявку — перезвоним в рабочее время.',
   })
   const { settings, showToast, openCall } = useSite()
+  const { t } = useT()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [consent, setConsent] = useState(false)
@@ -41,7 +43,7 @@ export default function Contacts() {
       })
       f.reset()
       setConsent(false) // форма очищена — согласие тоже сбрасываем
-      showToast('Сообщение отправлено. Спасибо!')
+      showToast(t('contacts_toast'))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -52,15 +54,15 @@ export default function Contacts() {
   const rows = [
     // Реквизиты — первыми и только когда заполнены: по закону о защите прав
     // потребителей продавец должен быть назван.
-    settings.legal_name && { k: 'Наименование', v: settings.legal_name },
-    settings.bin && { k: 'БИН', v: settings.bin },
-    { k: 'Адрес', v: settings.address },
-    { k: 'Телефон', v: <a href={telHref}>{settings.phone}</a> },
-    { k: 'E-mail', v: <a href={`mailto:${settings.email}`}>{settings.email}</a> },
-    { k: 'Часы работы', v: settings.hours },
+    settings.legal_name && { k: t('r_name'), v: settings.legal_name },
+    settings.bin && { k: t('r_bin'), v: settings.bin },
+    { k: t('r_address'), v: settings.address },
+    { k: t('r_phone'), v: <a href={telHref}>{settings.phone}</a> },
+    { k: t('r_email'), v: <a href={`mailto:${settings.email}`}>{settings.email}</a> },
+    { k: t('r_hours'), v: settings.hours },
     // Строка появляется, только когда в настройках указана хотя бы одна ссылка.
     SOCIAL.some(({ key }) => settings[key]) && {
-      k: 'Соцсети',
+      k: t('r_social'),
       v: (
         <div className="contact-social">
           {SOCIAL.map(({ key, name }) =>
@@ -78,8 +80,8 @@ export default function Contacts() {
   return (
     <main className="route-fade">
       <div className="wrap page-head">
-        <span className="kicker">Связаться</span>
-        <h1>Контакты</h1>
+        <span className="kicker">{t('contacts_kicker')}</span>
+        <h1>{t('contacts_title')}</h1>
       </div>
 
       <div className="wrap" style={{ paddingBottom: 72 }}>
@@ -98,37 +100,31 @@ export default function Contacts() {
                 style={{ marginTop: 20 }}
                 onClick={openCall}
               >
-                Заказать звонок
+                {t('call_order')}
               </button>
             </div>
 
             <div className="map-stub">
               <div className="media-stub">
-                <span>Карта проезда</span>
+                <span>{t('map_stub')}</span>
               </div>
             </div>
           </Reveal>
 
           <Reveal className="form-panel frame" variant="right" delay={120}>
-            <h2 style={{ fontSize: 26 }}>Обратная связь</h2>
+            <h2 style={{ fontSize: 26 }}>{t('fb_title')}</h2>
             <p style={{ color: 'var(--text-2)', margin: '10px 0 22px', fontSize: 15 }}>
-              Оставьте сообщение — перезвоним в рабочее время.
+              {t('fb_lead')}
             </p>
 
             <form onSubmit={submit}>
               {error && <div className="form-error">{error}</div>}
               <div className="field">
-                <label htmlFor="c_name">Ваше имя</label>
-                <input
-                  id="c_name"
-                  className="input"
-                  name="c_name"
-                  required
-                  placeholder="Как к вам обращаться"
-                />
+                <label htmlFor="c_name">{t('f_name')}</label>
+                <input id="c_name" className="input" name="c_name" required placeholder={t('f_name_ph')} />
               </div>
               <div className="field">
-                <label htmlFor="c_phone">Телефон</label>
+                <label htmlFor="c_phone">{t('f_phone')}</label>
                 <input
                   id="c_phone"
                   className="input"
@@ -141,13 +137,8 @@ export default function Contacts() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="c_msg">Сообщение</label>
-                <textarea
-                  id="c_msg"
-                  className="input"
-                  name="c_msg"
-                  placeholder="Что вас интересует"
-                />
+                <label htmlFor="c_msg">{t('f_msg')}</label>
+                <textarea id="c_msg" className="input" name="c_msg" placeholder={t('f_msg_ph')} />
               </div>
               <Honeypot name="c_website" />
               <ConsentCheck id="c_consent" checked={consent} onChange={setConsent} />
@@ -156,7 +147,7 @@ export default function Contacts() {
                 className="btn btn-primary btn-block"
                 disabled={sending || !consent}
               >
-                {sending ? 'Отправляем…' : 'Отправить'}
+                {sending ? t('sending') : t('send')}
               </button>
             </form>
           </Reveal>

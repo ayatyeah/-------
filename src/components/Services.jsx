@@ -1,24 +1,25 @@
 import Icon from './Icon'
 import Reveal from './Reveal'
+import { useT } from '../i18n'
 
 /** Раздел «Услуги» — данные приходят из /api/home, редактируются в админке. */
 export default function Services({ items = [] }) {
+  const { t, td } = useT()
   if (items.length === 0) return null
 
   return (
     <section className="section section--alt" id="services">
       <div className="wrap">
         <Reveal as="span" className="kicker">
-          Услуги
+          {t('svc_kicker')}
         </Reveal>
         <div className="section-head">
           <div>
             <Reveal as="h2" delay={60}>
-              Не только продаём — ведём хозяйство дальше
+              {t('svc_title')}
             </Reveal>
             <Reveal as="p" className="lead" delay={120} style={{ marginTop: 12 }}>
-              Техника — это половина дела. Вторая половина начинается после отгрузки:
-              запчасти, сервис в поле и помощь с документами.
+              {t('svc_lead')}
             </Reveal>
           </div>
         </div>
@@ -30,12 +31,12 @@ export default function Services({ items = [] }) {
                 <div className="svc-ico">
                   <Icon name={s.icon} size={24} />
                 </div>
-                <h3>{s.title}</h3>
-                <p>{s.text}</p>
+                <h3>{td(s.title)}</h3>
+                <p>{td(s.text)}</p>
                 {s.note && (
                   <span className="svc-note">
                     <Icon name="check" size={14} />
-                    {s.note}
+                    {td(s.note)}
                   </span>
                 )}
               </article>

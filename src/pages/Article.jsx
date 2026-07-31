@@ -1,14 +1,16 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, formatDate } from '../api'
+import { api } from '../api'
 import { useFetch } from '../store'
 import { Media, ErrorState } from '../components/ui'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
 export default function Article() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t, fdate } = useT()
   const { data: a, loading, error, reload } = useFetch(() => api.article(id), [id])
 
   // Заголовок и описание — из самой статьи; description берём из первого
@@ -38,7 +40,7 @@ export default function Article() {
         <ErrorState message={error} onRetry={reload} />
         <div style={{ textAlign: 'center', paddingBottom: 60 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/news')}>
-            ← Все новости
+            {t('back_news')}
           </button>
         </div>
       </main>
@@ -49,15 +51,15 @@ export default function Article() {
     <main className="wrap route-fade" style={{ paddingBlock: '36px 72px' }}>
       <div className="article-head">
         <button type="button" className="back-link" onClick={() => navigate('/news')}>
-          ← Все новости
+          {t('back_news')}
         </button>
-        <span className="card-meta">{formatDate(a.date)}</span>
+        <span className="card-meta">{fdate(a.date)}</span>
         <h1 className="article-title">{a.title}</h1>
       </div>
 
       <Reveal variant="clip" style={{ maxWidth: 900, marginInline: 'auto' }}>
         <figure className="article-cover" style={{ marginBlock: 0 }}>
-          <Media src={a.cover} alt={a.title} stub="Обложка статьи" />
+          <Media src={a.cover} alt={a.title} stub={t('article_cover')} />
         </figure>
       </Reveal>
 
@@ -71,7 +73,7 @@ export default function Article() {
 
       <div style={{ textAlign: 'center', marginTop: 48 }}>
         <button type="button" className="btn btn-secondary" onClick={() => navigate('/news')}>
-          ← Все новости
+          {t('back_news')}
         </button>
       </div>
     </main>

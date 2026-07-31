@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 import { PRIVACY_VERSION } from '../../shared/constants.js'
 
 const PRIVACY_DATE = '24 июля 2026 года'
@@ -15,6 +16,7 @@ const PRIVACY_DATE = '24 июля 2026 года'
  * иначе он превратится в неправду.
  */
 export default function Privacy() {
+  const { lang, t } = useT()
   usePageMeta({
     title: 'Политика конфиденциальности',
     description: 'Как ТОО «СХМ Агро» обрабатывает персональные данные, оставленные на сайте.',
@@ -24,7 +26,7 @@ export default function Privacy() {
   return (
     <main className="route-fade">
       <div className="wrap page-head">
-        <span className="kicker">Документы</span>
+        <span className="kicker">{t('docs_kicker')}</span>
         <h1>Политика конфиденциальности</h1>
         <p className="lead" style={{ marginTop: 12 }}>
           Как ТОО «СХМ Агро» обращается с персональными данными, которые вы оставляете на сайте.
@@ -32,6 +34,9 @@ export default function Privacy() {
       </div>
 
       <div className="wrap doc" style={{ paddingBottom: 80 }}>
+        {/* Юридический текст ведём на одном языке: перевод политики — это
+            юридическая работа, машинный перевод здесь опаснее его отсутствия. */}
+        {lang !== 'ru' && <p className="doc-meta">{t('legal_note')}</p>}
         <Reveal as="p" className="doc-meta" title={`Редакция ${PRIVACY_VERSION}`}>
           Редакция от {PRIVACY_DATE}
         </Reveal>

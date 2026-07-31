@@ -19,24 +19,26 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import CookieConsent from './components/CookieConsent'
 import usePageMeta from './hooks/usePageMeta'
+import { useT } from './i18n'
 
 // Админку грузим отдельным чанком: посетителям сайта она не нужна,
 // а весит она больше любой публичной страницы.
 const Admin = lazy(() => import('./pages/Admin'))
 
 function NotFound() {
+  const { t } = useT()
   usePageMeta({ title: 'Страница не найдена', noindex: true })
   return (
     <main className="wrap" style={{ paddingBlock: 100, textAlign: 'center' }}>
       <span className="kicker" style={{ justifyContent: 'center' }}>
-        Ошибка 404
+        {t('nf_kicker')}
       </span>
-      <h1 style={{ fontSize: 48, margin: '16px 0 12px' }}>Страница не найдена</h1>
+      <h1 style={{ fontSize: 48, margin: '16px 0 12px' }}>{t('nf_title')}</h1>
       <p className="lead" style={{ marginInline: 'auto', marginBottom: 28 }}>
-        Возможно, ссылка устарела или страница была перенесена.
+        {t('nf_text')}
       </p>
       <Link to="/" className="btn btn-primary">
-        На главную
+        {t('nf_home')}
       </Link>
     </main>
   )
@@ -56,6 +58,7 @@ function ScrollTop() {
 function Shell() {
   const { pathname } = useLocation()
   const { openCall } = useSite()
+  const { t } = useT()
   const isAdmin = pathname.startsWith('/admin')
   // Пока листают вниз — прячем стопку, чтобы не закрывала текст.
   const stackHidden = useHiddenOnScrollDown()
@@ -68,7 +71,7 @@ function Shell() {
           контенту (требование доступности). */}
       {!isAdmin && (
         <a href="#main" className="skip-link">
-          К содержанию
+          {t('skip_link')}
         </a>
       )}
       {!isAdmin && <Navbar />}
@@ -90,7 +93,7 @@ function Shell() {
             <Suspense
               fallback={
                 <div className="state">
-                  <div className="state-title">Загружаем админку…</div>
+                  <div className="state-title">{t('admin_loading')}</div>
                 </div>
               }
             >
@@ -115,10 +118,10 @@ function Shell() {
             type="button"
             className="btn btn-brass float-call"
             onClick={openCall}
-            aria-label="Заказать звонок"
+            aria-label={t('call_order')}
           >
             <Icon name="phone" size={18} />
-            <span>Заказать звонок</span>
+            <span>{t('call_order')}</span>
           </button>
         </div>
       )}

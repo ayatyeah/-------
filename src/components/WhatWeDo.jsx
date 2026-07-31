@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import Icon from './Icon'
 import Reveal from './Reveal'
+import { useT } from '../i18n'
 
 /**
  * «Что мы делаем» — первый содержательный экран после героя.
@@ -9,11 +10,12 @@ import Reveal from './Reveal'
  * с живым числом моделей из каталога.
  */
 
+// t/p — ключи словаря (src/locales), тексты переводятся с языком сайта.
 const CYCLE = [
-  { icon: 'factory', t: 'Производим', p: 'Льём узлы, собираем и красим на своём заводе' },
-  { icon: 'compass', t: 'Подбираем', p: 'Считаем технику под ваши гектары и культуры' },
-  { icon: 'truck', t: 'Поставляем', p: 'Привозим в хозяйство, запускаем, обучаем' },
-  { icon: 'wrench', t: 'Обслуживаем', p: 'Сервис в поле и запчасти со склада' },
+  { icon: 'factory', t: 'wwd_1t', p: 'wwd_1p' },
+  { icon: 'compass', t: 'wwd_2t', p: 'wwd_2p' },
+  { icon: 'truck', t: 'wwd_3t', p: 'wwd_3p' },
+  { icon: 'wrench', t: 'wwd_4t', p: 'wwd_4p' },
 ]
 
 /**
@@ -34,6 +36,7 @@ const CAT_ICON = {
 const иконкаКатегории = (c) => c.icon || CAT_ICON[c.id] || 'gear'
 
 export default function WhatWeDo({ models = [], categories = [] }) {
+  const { t, td, tModels } = useT()
   // Считаем модели по категориям — цифры всегда честные, из каталога.
   const cats = categories
     .map((c) => ({ ...c, count: models.filter((m) => m.cat === c.id).length }))
@@ -43,10 +46,10 @@ export default function WhatWeDo({ models = [], categories = [] }) {
     <section className="section wwd">
       <div className="wrap">
         <Reveal as="span" className="kicker">
-          Чем мы занимаемся
+          {t('wwd_kicker')}
         </Reveal>
         <Reveal as="h2" className="wwd-title" delay={60}>
-          Делаем сельхозтехнику и ведём её весь срок службы
+          {t('wwd_title')}
         </Reveal>
 
         <div className="wwd-grid">
@@ -58,8 +61,8 @@ export default function WhatWeDo({ models = [], categories = [] }) {
                   <Icon name={s.icon} size={20} />
                 </div>
                 <div>
-                  <h3>{s.t}</h3>
-                  <p>{s.p}</p>
+                  <h3>{t(s.t)}</h3>
+                  <p>{t(s.p)}</p>
                 </div>
               </div>
             ))}
@@ -67,20 +70,18 @@ export default function WhatWeDo({ models = [], categories = [] }) {
 
           {/* Что выпускаем: категории с числом моделей */}
           <Reveal className="wwd-make" variant="right" delay={180}>
-            <div className="wwd-make-head">Что выпускаем</div>
+            <div className="wwd-make-head">{t('wwd_make')}</div>
             <div className="wwd-cats">
               {cats.map((c) => (
                 <Link className="wwd-cat" to={`/catalog?cat=${c.id}`} key={c.id}>
                   <Icon name={иконкаКатегории(c)} size={26} />
-                  <span className="wwd-cat-name">{c.name}</span>
-                  <span className="wwd-cat-count">
-                    {c.count} {c.count === 1 ? 'модель' : c.count < 5 ? 'модели' : 'моделей'}
-                  </span>
+                  <span className="wwd-cat-name">{td(c.name)}</span>
+                  <span className="wwd-cat-count">{tModels(c.count)}</span>
                 </Link>
               ))}
             </div>
             <Link to="/catalog" className="btn btn-primary btn-block wwd-cta">
-              Весь каталог
+              {t('wwd_all')}
             </Link>
           </Reveal>
         </div>

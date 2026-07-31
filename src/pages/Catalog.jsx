@@ -4,6 +4,7 @@ import { useFetch, useSite } from '../store'
 import { Media, Loading, ErrorState, EmptyState } from '../components/ui'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
 export default function Catalog() {
   usePageMeta({
@@ -12,6 +13,7 @@ export default function Catalog() {
       'Каталог агротехники завода СХМ Агро: тракторы, зерноуборочные комбайны, сеялки, посевные комплексы и бороны. Характеристики, наличие, лизинг и субсидии. Купить напрямую у производителя в Казахстане.',
   })
   const { openKP } = useSite()
+  const { t, td } = useT()
   const [params, setParams] = useSearchParams()
   const cat = params.get('cat') || 'all'
 
@@ -24,10 +26,10 @@ export default function Catalog() {
   const filtered = cat === 'all' ? all : all.filter((m) => m.cat === cat)
 
   const filters = [
-    { id: 'all', name: 'Вся техника', count: all.length },
+    { id: 'all', name: t('cat_all'), count: all.length },
     ...(cats.data ?? []).map((c) => ({
       id: c.id,
-      name: c.name,
+      name: td(c.name),
       count: all.filter((m) => m.cat === c.id).length,
     })),
   ]
@@ -37,18 +39,18 @@ export default function Catalog() {
   return (
     <main className="route-fade">
       <div className="wrap page-head">
-        <span className="kicker">Продукция</span>
-        <h1>Каталог техники</h1>
+        <span className="kicker">{t('cat_kicker')}</span>
+        <h1>{t('cat_title')}</h1>
         <p className="lead" style={{ marginTop: 14 }}>
           {/* Без «слева»: на телефоне категории стоят сверху лентой. */}
-          Выберите категорию — по каждой модели покажем характеристики и посчитаем цену.
+          {t('cat_lead')}
         </p>
       </div>
 
       <div className="wrap" style={{ paddingBottom: 72 }}>
         <div className="catalog-layout">
           <aside className="filters">
-            <div className="filters-title">Категории</div>
+            <div className="filters-title">{t('cat_filters')}</div>
             <div className="filters-list">
               {filters.map((f) => (
                 <button
@@ -72,13 +74,10 @@ export default function Catalog() {
 
             {!models.loading && !models.error && (
               <>
-                <div className="catalog-count">Показано моделей: {filtered.length}</div>
+                <div className="catalog-count">{t('cat_shown')} {filtered.length}</div>
 
                 {filtered.length === 0 ? (
-                  <EmptyState
-                    title="В этой категории пока пусто"
-                    text="Выберите другую категорию или посмотрите всю технику."
-                  />
+                  <EmptyState title={t('cat_empty_t')} text={t('cat_empty_p')} />
                 ) : (
                   <div className="grid-2">
                     {filtered.map((m, i) => (
@@ -90,11 +89,11 @@ export default function Catalog() {
                             доступны с клавиатуры. */}
                         <article className="card card--link" style={{ height: '100%' }}>
                           <Link to={`/catalog/${m.id}`} className="card-media" aria-label={m.name}>
-                            {m.subsidized && <span className="tag tag-brass">Субсидируется</span>}
-                            <Media src={m.photo} alt={m.name} stub={m.catName} />
+                            {m.subsidized && <span className="tag tag-brass">{t('subsidized')}</span>}
+                            <Media src={m.photo} alt={m.name} stub={td(m.catName)} />
                           </Link>
                           <div className="card-body">
-                            <span className="card-kicker">{m.catName}</span>
+                            <span className="card-kicker">{td(m.catName)}</span>
                             <h3 className="card-title">
                               <Link to={`/catalog/${m.id}`} className="card-title-link">
                                 {m.name}
@@ -103,14 +102,14 @@ export default function Catalog() {
                             <p className="card-text">{m.short}</p>
                             <div className="card-actions">
                               <Link to={`/catalog/${m.id}`} className="btn btn-primary btn-sm">
-                                Подробнее
+                                {t('more')}
                               </Link>
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 onClick={() => openKP(m)}
                               >
-                                Получить КП
+                                {t('get_kp')}
                               </button>
                             </div>
                           </div>

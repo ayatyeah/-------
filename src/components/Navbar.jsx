@@ -3,16 +3,20 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useSite } from '../store'
 import { useScrolled } from '../hooks/useMotion'
 import Icon from './Icon'
+import LangSwitcher from './LangSwitcher'
+import { useT } from '../i18n'
 
+// label — ключ словаря: подписи переводятся вместе с языком сайта.
 const LINKS = [
-  { to: '/catalog', label: 'Каталог' },
-  { to: '/about', label: 'О компании' },
-  { to: '/news', label: 'Новости' },
-  { to: '/contacts', label: 'Контакты' },
+  { to: '/catalog', label: 'nav_catalog' },
+  { to: '/about', label: 'nav_about' },
+  { to: '/news', label: 'nav_news' },
+  { to: '/contacts', label: 'nav_contacts' },
 ]
 
 export default function Navbar() {
   const { settings, openKP } = useSite()
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const scrolled = useScrolled()
@@ -24,38 +28,42 @@ export default function Navbar() {
   return (
     <nav className={`nav${scrolled ? ' is-scrolled' : ''}`}>
       <div className="nav-inner">
-        <Link to="/" className="brand" onClick={close} aria-label="ТОО СХМ Агро — на главную">
+        <Link to="/" className="brand" onClick={close} aria-label={t('nav_home_aria')}>
           <img src="/assets/logo.png" alt="" width="46" height="46" />
-          ТОО СХМ Агро
+          {t('brand')}
         </Link>
 
         {LINKS.map((l) => (
           <NavLink key={l.to} to={l.to} className="navlink hide-sm">
-            {l.label}
+            {t(l.label)}
           </NavLink>
         ))}
+
+        <span className="hide-sm">
+          <LangSwitcher />
+        </span>
 
         <a className="nav-phone hide-sm" href={telHref}>
           {settings.phone}
         </a>
 
         <button type="button" className="btn btn-primary btn-sm hide-sm" onClick={() => openKP()}>
-          Получить КП
+          {t('get_kp')}
         </button>
 
         <NavLink to="/admin" className="navlink nav-admin hide-sm">
-          Админка
+          {t('nav_admin')}
         </NavLink>
 
         {/* Когда меню сворачивается в бургер, звонок должен остаться под рукой. */}
-        <a className="nav-phone-sm" href={telHref} aria-label={`Позвонить ${settings.phone}`}>
+        <a className="nav-phone-sm" href={telHref} aria-label={`${t('nav_call_aria')} ${settings.phone}`}>
           <Icon name="phone" size={18} />
         </a>
 
         <button
           type="button"
           className="nav-burger"
-          aria-label="Меню"
+          aria-label={t('nav_menu')}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -68,11 +76,11 @@ export default function Navbar() {
       <div className={`nav-mobile${open ? ' open' : ''}`} key={location.pathname}>
         {LINKS.map((l) => (
           <NavLink key={l.to} to={l.to} className="navlink" onClick={close}>
-            {l.label}
+            {t(l.label)}
           </NavLink>
         ))}
         <NavLink to="/admin" className="navlink" onClick={close}>
-          Админка
+          {t('nav_admin')}
         </NavLink>
         <a className="navlink" href={telHref}>
           {settings.phone}
@@ -86,8 +94,9 @@ export default function Navbar() {
             openKP()
           }}
         >
-          Получить КП
+          {t('get_kp')}
         </button>
+        <LangSwitcher block />
       </div>
     </nav>
   )

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { formatDate } from '../api'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media } from '../components/ui'
@@ -15,11 +14,13 @@ import Production from '../components/Production'
 import { api } from '../api'
 import { useFetch } from '../store'
 import usePageMeta from '../hooks/usePageMeta'
+import { useT } from '../i18n'
 
+// t — ключи словаря (src/locales): плашки доверия переводятся с языком сайта.
 const TRUST = [
-  { icon: 'shield', t: 'Гарантия 2 года' },
-  { icon: 'wrench', t: '34 сервисных центра' },
-  { icon: 'percent', t: 'Лизинг и субсидии' },
+  { icon: 'shield', t: 'trust_warranty' },
+  { icon: 'wrench', t: 'trust_service' },
+  { icon: 'percent', t: 'trust_leasing' },
 ]
 
 /** Часть заголовка после запятой — латунью, второй строкой. */
@@ -37,6 +38,7 @@ function HeroTitle({ text }) {
 
 /** Лайтбокс сертификата. */
 function CertLightbox({ cert, onClose }) {
+  const { t, td } = useT()
   return (
     <div className="backdrop" onClick={onClose}>
       <div className="lightbox" onClick={(e) => e.stopPropagation()}>
@@ -45,14 +47,14 @@ function CertLightbox({ cert, onClose }) {
             СХМ
           </div>
           <div className="cert-title" style={{ fontSize: 24 }}>
-            {cert.title}
+            {td(cert.title)}
           </div>
-          <div className="cert-org">{cert.org}</div>
+          <div className="cert-org">{td(cert.org)}</div>
         </div>
         <div className="lightbox-cap">
-          <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{cert.title}</span>
+          <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{td(cert.title)}</span>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Закрыть ✕
+            {t('close_x')}
           </button>
         </div>
       </div>
@@ -70,6 +72,7 @@ export default function Home() {
   })
   // Все данные главной приходят одним запросом /api/home из провайдера.
   const { settings, home, openKP } = useSite()
+  const { t, td, fdate, lang } = useT()
   const navigate = useNavigate()
   const [cert, setCert] = useState(null)
   const tiltRef = useTilt(9)
@@ -93,13 +96,17 @@ export default function Home() {
         <div className="hero-inner">
           <div>
             <Reveal as="span" variant="fade" className="kicker kicker--light">
-              Производство · Продажа · Сервис
+              {t('hero_kicker')}
             </Reveal>
+            {/* Русский герой правится в админке (settings). Для казахского и
+                английского берём перевод из словаря: полей на трёх языках в
+                админке пока нет, а русский текст в казахском интерфейсе
+                выглядел бы хуже, чем выверенный перевод текущего героя. */}
             <Reveal as="h1" delay={80}>
-              <HeroTitle text={settings.hero_title} />
+              <HeroTitle text={lang === 'ru' ? settings.hero_title : t('hero_title')} />
             </Reveal>
             <Reveal as="p" delay={160}>
-              {settings.hero_subtitle}
+              {lang === 'ru' ? settings.hero_subtitle : t('hero_subtitle')}
             </Reveal>
             <Reveal className="hero-actions" delay={240}>
               <button
@@ -107,22 +114,22 @@ export default function Home() {
                 className="btn btn-brass btn-lg"
                 onClick={() => navigate('/catalog')}
               >
-                Смотреть каталог
+                {t('hero_catalog')}
               </button>
               <button
                 type="button"
                 className="btn btn-secondary btn-secondary--light btn-lg"
                 onClick={() => openKP()}
               >
-                Рассчитать цену
+                {t('hero_price')}
               </button>
             </Reveal>
 
             <Reveal className="hero-trust" delay={320}>
-              {TRUST.map((t) => (
-                <span className="hero-trust-item" key={t.t}>
-                  <Icon name={t.icon} size={17} />
-                  {t.t}
+              {TRUST.map((item) => (
+                <span className="hero-trust-item" key={item.t}>
+                  <Icon name={item.icon} size={17} />
+                  {t(item.t)}
                 </span>
               ))}
             </Reveal>
@@ -139,7 +146,7 @@ export default function Home() {
                 src="/assets/hero-field.webp"
                 srcSet="/assets/hero-field-sm.webp 760w, /assets/hero-field.webp 1200w"
                 sizes="(max-width: 1000px) 100vw, 560px"
-                alt="Посевной комплекс СХМ в поле"
+                alt={t('hero_img_alt')}
                 width="1200"
                 height="655"
                 fetchpriority="high"
@@ -157,7 +164,7 @@ export default function Home() {
                 <div className="stat-v">
                   <CountUp value={s.v} />
                 </div>
-                <div className="stat-k">{s.k}</div>
+                <div className="stat-k">{td(s.k)}</div>
               </div>
             ))}
           </div>
@@ -174,25 +181,17 @@ export default function Home() {
       <section className="section" id="about">
         <div className="wrap">
           <Reveal as="span" className="kicker">
-            О компании
+            {t('about_kicker')}
           </Reveal>
           <div className="about-grid">
             <Reveal as="h2" variant="left">
-              18 лет строим технику для казахстанских хозяйств
+              {t('home_about_title')}
             </Reveal>
             <Reveal className="about-text" variant="right" delay={120}>
-              <p>
-                СХМ Агро — не перекупщики. Мы делаем технику сами: льём узлы, собираем, красим и
-                обкатываем на своём полигоне. Поэтому знаем каждую машину до болта и отвечаем за неё
-                после продажи.
-              </p>
-              <p>
-                Конструкцию считаем под степь: перепады от −40 до +40, пыль, длинные гоны и работа
-                по 16 часов в смену. Отсюда запас прочности, простое обслуживание и запчасти,
-                которые есть на складе, а не «под заказ из Европы».
-              </p>
+              <p>{t('home_about_p1')}</p>
+              <p>{t('home_about_p2')}</p>
               <Link to="/about" className="btn btn-ghost" style={{ marginTop: 14 }}>
-                Подробнее о производстве →
+                {t('home_about_more')}
               </Link>
             </Reveal>
           </div>
@@ -213,15 +212,15 @@ export default function Home() {
       <section className="section">
         <div className="wrap">
           <Reveal as="span" className="kicker">
-            Сертификаты
+            {t('certs_kicker')}
           </Reveal>
           <div className="section-head">
             <div>
               <Reveal as="h2" delay={60}>
-                Соответствие и качество
+                {t('certs_title')}
               </Reveal>
               <Reveal as="p" className="lead" delay={120} style={{ marginTop: 10, fontSize: 16 }}>
-                Нажмите на карточку, чтобы увеличить.
+                {t('certs_hint')}
               </Reveal>
             </div>
           </div>
@@ -236,8 +235,8 @@ export default function Home() {
                 >
                   <div className="cert-seal">СХМ</div>
                   <div>
-                    <div className="cert-title">{c.title}</div>
-                    <div className="cert-org">{c.org}</div>
+                    <div className="cert-title">{td(c.title)}</div>
+                    <div className="cert-org">{td(c.org)}</div>
                   </div>
                 </button>
               </Reveal>
@@ -251,36 +250,30 @@ export default function Home() {
         <div className="wrap">
           <div className="grid-2">
             <Reveal className="banner frame" variant="left">
-              <span className="tag tag-brass">Лизинг</span>
-              <h3>Работаем через КазАгроФинанс</h3>
-              <p>
-                Оформите технику в лизинг с государственной поддержкой. Первоначальный взнос,
-                льготная ставка и понятный график платежей — подайте заявку напрямую.
-              </p>
+              <span className="tag tag-brass">{t('tag_leasing')}</span>
+              <h3>{t('leasing_title')}</h3>
+              <p>{t('leasing_text')}</p>
               <a
                 className="btn btn-secondary"
                 href={settings.leasing_url}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Подать заявку на лизинг →
+                {t('leasing_cta')}
               </a>
             </Reveal>
 
             <Reveal className="banner frame" variant="right" delay={120}>
-              <span className="tag tag-brass">Субсидии</span>
-              <h3>Субсидируемая техника</h3>
-              <p>
-                Часть нашей техники включена в перечень государственных субсидий. Проверьте
-                актуальный список моделей и условия на портале ГосАгро.
-              </p>
+              <span className="tag tag-brass">{t('tag_subsidy')}</span>
+              <h3>{t('subsidy_title')}</h3>
+              <p>{t('subsidy_text')}</p>
               <a
                 className="btn btn-secondary"
                 href={settings.subsidy_url}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Перечень на ГосАгро →
+                {t('subsidy_cta')}
               </a>
             </Reveal>
           </div>
@@ -293,15 +286,15 @@ export default function Home() {
           <div className="section-head">
             <div>
               <Reveal as="span" className="kicker">
-                Новости
+                {t('news_kicker')}
               </Reveal>
               <Reveal as="h2" delay={60}>
-                Последнее из хозяйства
+                {t('news_home_title')}
               </Reveal>
             </div>
             <Reveal delay={120}>
               <Link to="/news" className="btn btn-secondary">
-                Все новости →
+                {t('news_all')}
               </Link>
             </Reveal>
           </div>
@@ -311,14 +304,14 @@ export default function Home() {
               <Reveal key={n.id} delay={i * 110}>
                 <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
-                    <Media src={n.cover} alt={n.title} stub="Обложка" />
+                    <Media src={n.cover} alt={n.title} stub={t('cover_stub')} />
                   </div>
                   <div className="card-body">
-                    <span className="card-meta">{formatDate(n.date)}</span>
+                    <span className="card-meta">{fdate(n.date)}</span>
                     <h3 className="card-title">{n.title}</h3>
                     <p className="card-text">{n.excerpt}</p>
                     <span className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>
-                      Читать →
+                      {t('read')}
                     </span>
                   </div>
                 </Link>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import Icon from './Icon'
+import { useT } from '../i18n'
 
 /**
  * ИИ-ассистент в углу экрана.
@@ -11,19 +12,15 @@ import Icon from './Icon'
  * менять не нужно. В шапке честно пишем, кто отвечает.
  */
 
-const GREETING =
-  'Здравствуйте! Я помощник СХМ Агро. Спрошу пару вопросов и подскажу по технике, лизингу, субсидиям и сервису.'
-
-const SUGGESTIONS = [
-  'Какие есть тракторы?',
-  'Что попадает под субсидию?',
-  'Как оформить лизинг?',
-  'Какая гарантия?',
-]
+const SUGGESTION_KEYS = ['ai_sugg_1', 'ai_sugg_2', 'ai_sugg_3', 'ai_sugg_4']
 
 export default function AiChat() {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState([{ role: 'assistant', text: GREETING }])
+  /* Приветствие кладём при первом рендере на текущем языке. Уже начатую
+     переписку при смене языка не переписываем — реплики пользователя и ИИ
+     пришли на том языке, на котором их писали. */
+  const [messages, setMessages] = useState(() => [{ role: 'assistant', text: t('ai_greeting') }])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [engine, setEngine] = useState(null)
@@ -72,7 +69,7 @@ export default function AiChat() {
     } catch (e) {
       setMessages((p) => [
         ...p,
-        { role: 'assistant', text: 'Связь с сервером пропала. Попробуйте ещё раз или позвоните нам.' },
+        { role: 'assistant', text: t('ai_err') },
       ])
     } finally {
       setBusy(false)
@@ -85,28 +82,26 @@ export default function AiChat() {
         type="button"
         className={`ai-fab${open ? ' is-open' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Закрыть чат' : 'Открыть чат с помощником'}
+        aria-label={open ? t('ai_close_chat') : t('ai_open')}
         aria-expanded={open}
       >
         {open ? '✕' : <Icon name="chat" size={22} />}
-        {!open && <span className="ai-fab-label">Спросить</span>}
+        {!open && <span className="ai-fab-label">{t('ai_ask')}</span>}
       </button>
 
       {open && (
-        <div className="ai-panel" role="dialog" aria-label="ИИ-помощник СХМ Агро">
+        <div className="ai-panel" role="dialog" aria-label={t('ai_dialog_aria')}>
           <header className="ai-head">
             <span className="ai-dot" />
             <div>
-              <div className="ai-title">Помощник СХМ Агро</div>
+              <div className="ai-title">{t('ai_title')}</div>
               <div className="ai-sub">
                 {/* 'rules' — это ответы по ключевым словам без ИИ.
                     Любой другой движок (gemini, openai) — настоящий ИИ. */}
-                {engine && engine !== 'rules'
-                  ? 'На связи · отвечает ИИ'
-                  : 'На связи · отвечает по базе знаний'}
+                {engine && engine !== 'rules' ? t('ai_online_ai') : t('ai_online_kb')}
               </div>
             </div>
-            <button type="button" className="ai-close" onClick={() => setOpen(false)} aria-label="Закрыть">
+            <button type="button" className="ai-close" onClick={() => setOpen(false)} aria-label={t('close')}>
               ✕
             </button>
           </header>
@@ -128,9 +123,9 @@ export default function AiChat() {
 
             {messages.length === 1 && !busy && (
               <div className="ai-chips">
-                {SUGGESTIONS.map((s) => (
-                  <button type="button" key={s} className="ai-chip" onClick={() => send(s)}>
-                    {s}
+                {SUGGESTION_KEYS.map((k) => (
+                  <button type="button" key={k} className="ai-chip" onClick={() => send(t(k))}>
+                    {t(k)}
                   </button>
                 ))}
               </div>
@@ -149,15 +144,15 @@ export default function AiChat() {
               className="ai-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Спросите о технике…"
+              placeholder={t('ai_ph')}
               maxLength={2000}
-              aria-label="Сообщение"
+              aria-label={t('ai_msg_aria')}
             />
             <button
               type="submit"
               className="ai-send"
               disabled={busy || !input.trim()}
-              aria-label="Отправить"
+              aria-label={t('ai_send_aria')}
             >
               →
             </button>
@@ -166,9 +161,9 @@ export default function AiChat() {
           {/* Переписку обрабатывает сторонний ИИ-сервис — человек должен знать
               об этом до того, как что-то напишет, а не из политики постфактум. */}
           <div className="ai-note">
-            Отвечает ИИ — не вводите личные данные.{' '}
+            {t('ai_note')}
             <Link to="/privacy" target="_blank" rel="noopener noreferrer">
-              Подробнее
+              {t('ai_more')}
             </Link>
           </div>
         </div>
