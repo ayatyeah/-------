@@ -3,7 +3,14 @@ import { api } from '../api'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import { ConsentCheck, Honeypot } from '../components/ui'
+import Icon from '../components/Icon'
 import usePageMeta from '../hooks/usePageMeta'
+
+const SOCIAL = [
+  { key: 'instagram_url', name: 'Instagram' },
+  { key: 'telegram_url', name: 'Telegram' },
+  { key: 'whatsapp_url', name: 'WhatsApp' },
+]
 
 export default function Contacts() {
   usePageMeta({
@@ -51,6 +58,21 @@ export default function Contacts() {
     { k: 'Телефон', v: <a href={telHref}>{settings.phone}</a> },
     { k: 'E-mail', v: <a href={`mailto:${settings.email}`}>{settings.email}</a> },
     { k: 'Часы работы', v: settings.hours },
+    // Строка появляется, только когда в настройках указана хотя бы одна ссылка.
+    SOCIAL.some(({ key }) => settings[key]) && {
+      k: 'Соцсети',
+      v: (
+        <div className="contact-social">
+          {SOCIAL.map(({ key, name }) =>
+            settings[key] ? (
+              <a key={key} href={settings[key]} aria-label={name} target="_blank" rel="noopener noreferrer">
+                <Icon name={name.toLowerCase()} size={19} />
+              </a>
+            ) : null
+          )}
+        </div>
+      ),
+    },
   ].filter(Boolean)
 
   return (
