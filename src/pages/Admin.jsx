@@ -684,32 +684,66 @@ function RequestsTab({ requests, reload }) {
 
 /* --------------------------- вкладка: настройки -------------------------- */
 
+/* Подписи полей — нужны и для <label>, и для текста ошибки («Не сохранено:
+   Instagram»), поэтому одна карта на оба случая. */
+const SETTINGS_FIELD_LABELS = {
+  phone: 'Телефон',
+  email: 'E-mail',
+  address: 'Адрес',
+  hours: 'Часы работы',
+  legal_name: 'Полное наименование',
+  bin: 'БИН',
+  leasing_url: 'КазАгроФинанс (лизинг)',
+  subsidy_url: 'ГосАгро (субсидии)',
+  instagram_url: 'Instagram',
+  telegram_url: 'Telegram',
+  whatsapp_url: 'WhatsApp',
+  hero_title: 'Заголовок героя',
+  hero_subtitle: 'Подзаголовок',
+}
+
 function SettingsTab({ onRelogin }) {
   const { settings, setSettings, showToast } = useSite()
   const [f, setF] = useState(settings)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [savingGroup, setSavingGroup] = useState(null)
+  const [groupError, setGroupError] = useState({})
 
   // Настройки могут догрузиться после монтирования вкладки.
   useEffect(() => setF(settings), [settings])
 
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
-  async function save() {
-    setSaving(true)
-    setError(null)
+  /* Каждая карточка сохраняется своим набором ключей, а не всей формой сразу:
+     раньше одна кнопка внизу отправляла ВСЁ разом, и правка телефона могла
+     утащить с собой недописанную ссылку в соцсетях. Заодно ошибка теперь не
+     проглатывается молча: сервер (см. store.js settings.update) отдельно
+     сообщает, какие ссылки не принял — раньше невалидная ссылка (без
+     https://) молча превращалась в пустую строку, а тост всё равно говорил
+     «сохранено». */
+  async function saveGroup(groupKey, keys, label) {
+    setSavingGroup(groupKey)
+    setGroupError((e) => ({ ...e, [groupKey]: null }))
     try {
-      const saved = await api.admin.saveSettings(f)
+      const patch = Object.fromEntries(keys.map((k) => [k, f[k] ?? '']))
+      const saved = await api.admin.saveSettings(patch)
       setSettings((prev) => ({ ...prev, ...saved }))
-      showToast('Настройки сохранены')
+      if (saved.rejected?.length) {
+        const names = saved.rejected.map((k) => SETTINGS_FIELD_LABELS[k] || k).join(', ')
+        setGroupError((e) => ({
+          ...e,
+          [groupKey]: `Не сохранено: ${names} — ссылка должна начинаться с https://`,
+        }))
+      } else {
+        showToast(`Сохранено: ${label}`)
+      }
     } catch (e) {
-      setError(e.message)
+      setGroupError((er) => ({ ...er, [groupKey]: e.message }))
     } finally {
-      setSaving(false)
+      setSavingGroup(null)
     }
   }
 
-  const field = (key, label, type = 'input') => (
+  const field = (key, label, type = 'input', placeholder) => (
     <div className="field" key={key}>
       <label htmlFor={`s_${key}`}>{label}</label>
       {type === 'textarea' ? (
@@ -723,6 +757,7 @@ function SettingsTab({ onRelogin }) {
         <input
           id={`s_${key}`}
           className="input"
+          placeholder={placeholder}
           value={f[key] ?? ''}
           onChange={(e) => upd(key, e.target.value)}
         />
@@ -730,16 +765,28 @@ function SettingsTab({ onRelogin }) {
     </div>
   )
 
+  const saveButton = (groupKey, keys, label) => (
+    <>
+      {groupError[groupKey] && <div className="form-error">{groupError[groupKey]}</div>}
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        onClick={() => saveGroup(groupKey, keys, label)}
+        disabled={savingGroup === groupKey}
+      >
+        {savingGroup === groupKey ? 'Сохраняем…' : `Сохранить (${label})`}
+      </button>
+    </>
+  )
+
   return (
     <>
       <div className="admin-head">
         <div>
           <h1>Настройки</h1>
-          <p className="admin-hint">Контакты, ссылки и тексты главной страницы.</p>
+          <p className="admin-hint">Контакты, ссылки и тексты главной страницы. Каждая карточка сохраняется своей кнопкой.</p>
         </div>
       </div>
-
-      {error && <div className="form-error">{error}</div>}
 
       <div className="admin-settings">
         <div className="admin-settings-panel">
@@ -748,6 +795,7 @@ function SettingsTab({ onRelogin }) {
           {field('email', 'E-mail')}
           {field('address', 'Адрес')}
           {field('hours', 'Часы работы')}
+          {saveButton('contacts', ['phone', 'email', 'address', 'hours'], 'Контакты')}
         </div>
 
         <div className="admin-settings-panel">
@@ -758,38 +806,38 @@ function SettingsTab({ onRelogin }) {
           </p>
           {field('legal_name', 'Полное наименование (ТОО «…»)')}
           {field('bin', 'БИН')}
+          {saveButton('legal', ['legal_name', 'bin'], 'Реквизиты')}
         </div>
 
         <div className="admin-settings-panel">
           <h3>Внешние ссылки</h3>
-          {field('leasing_url', 'КазАгроФинанс (лизинг)')}
-          {field('subsidy_url', 'ГосАгро (субсидии)')}
+          {field('leasing_url', 'КазАгроФинанс (лизинг)', 'input', 'https://…')}
+          {field('subsidy_url', 'ГосАгро (субсидии)', 'input', 'https://…')}
+          {saveButton('links', ['leasing_url', 'subsidy_url'], 'Внешние ссылки')}
         </div>
 
         <div className="admin-settings-panel">
           <h3>Соцсети</h3>
           <p className="admin-hint" style={{ marginBottom: 12 }}>
-            Пустое поле — значок не показывается в подвале.
+            Пустое поле — значок не показывается в подвале. Ссылка должна
+            начинаться с https://, иначе она не сохранится.
           </p>
-          {field('instagram_url', 'Instagram')}
-          {field('telegram_url', 'Telegram')}
-          {field('whatsapp_url', 'WhatsApp')}
+          {field('instagram_url', 'Instagram', 'input', 'https://instagram.com/…')}
+          {field('telegram_url', 'Telegram', 'input', 'https://t.me/…')}
+          {field('whatsapp_url', 'WhatsApp', 'input', 'https://wa.me/77001234567')}
+          {saveButton('social', ['instagram_url', 'telegram_url', 'whatsapp_url'], 'Соцсети')}
         </div>
 
         <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
           <h3>Тексты главной</h3>
           {field('hero_title', 'Заголовок героя')}
           {field('hero_subtitle', 'Подзаголовок', 'textarea')}
+          {saveButton('hero', ['hero_title', 'hero_subtitle'], 'Тексты главной')}
         </div>
       </div>
 
-      <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-        {saving ? 'Сохраняем…' : 'Сохранить изменения'}
-      </button>
-
-      {/* Ниже — то, что сохраняется само по себе, отдельно от кнопки выше:
-          у каждого блока своя кнопка, чтобы не смешивать смену пароля с
-          правкой телефона в подвале. */}
+      {/* Ниже — блоки со своей логикой сохранения (пароль требует текущий
+          пароль, регионы и бэкап не завязаны на форму выше вообще). */}
       <div className="admin-settings" style={{ marginTop: 34 }}>
         <RegionsPanel />
         <PasswordPanel onRelogin={onRelogin} />

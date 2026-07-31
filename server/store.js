@@ -909,14 +909,24 @@ export const settings = {
   },
   get: (key) => data.settings[key] ?? '',
   update(patch) {
+    const rejected = []
     for (const key of SETTING_KEYS) {
       if (!(key in patch)) continue
-      let v = str(patch[key], MAX.setting)
-      if (URL_KEYS.has(key)) v = safeUrl(v)
+      const v = str(patch[key], MAX.setting)
+      if (URL_KEYS.has(key) && v && !safeUrl(v)) {
+        /* Раньше невалидная ссылка молча превращалась в '' и затирала уже
+           сохранённое значение — админ вводил Instagram без https://,
+           получал тост «Настройки сохранены» и терял рабочую ссылку, даже
+           не поняв, что что-то пошло не так. Теперь просто не трогаем
+           сохранённое значение и говорим, что именно не приняли. Пустую
+           строку по-прежнему принимаем как есть — так поле осознанно чистят. */
+        rejected.push(key)
+        continue
+      }
       data.settings[key] = v
     }
     save()
-    return settings.publicAll()
+    return { ...settings.publicAll(), rejected }
   },
 }
 
