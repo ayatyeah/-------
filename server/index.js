@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as store from './store.js'
 import * as ai from './ai.js'
+import { renderPage } from './seo.js'
 import * as uploads from './uploads.js'
 import { notifyNewRequest } from './notify.js'
 import { PRIVACY_VERSION } from '../shared/constants.js'
@@ -1063,9 +1064,29 @@ const KNOWN_PATHS = new Set([
      Disallow в robots.txt и noindex на самой странице, а не код ответа. */
   '/admin',
 ])
-const KNOWN_PREFIXES = ['/catalog/', '/news/']
-const isKnownRoute = (p) =>
-  KNOWN_PATHS.has(p) || KNOWN_PREFIXES.some((pre) => p.startsWith(pre) && p.length > pre.length)
+/* Карточки и статьи сверяем с данными: раньше любой /catalog/что-угодно
+   получал 200 (soft-404) — с точки зрения поисковика это тысячи «настоящих»
+   пустых страниц. Теперь несуществующий id честно отвечает 404. */
+const isKnownRoute = (p) => {
+  if (KNOWN_PATHS.has(p)) return true
+  // Кривой процент-энкодинг (/catalog/%zz) не должен ронять запрос в 500.
+  const tail = (pre) => {
+    try {
+      return decodeURIComponent(p.slice(pre.length).replace(/\/+$/, ''))
+    } catch {
+      return ''
+    }
+  }
+  if (p.startsWith('/catalog/') && p.length > '/catalog/'.length) {
+    const m = store.models.get(tail('/catalog/'))
+    return !!(m && m.published !== false)
+  }
+  if (p.startsWith('/news/') && p.length > '/news/'.length) {
+    const n = store.news.get(tail('/news/'))
+    return !!(n && n.published !== false)
+  }
+  return false
+}
 
 if (existsSync(DIST)) {
   // Ассеты именованы по хешу содержимого — кешируем навсегда.
@@ -1086,6 +1107,17 @@ if (existsSync(DIST)) {
        dist/ уже нет, и закешированный HTML уводит браузер за файлом, которого не
        существует. ETag включён, поэтому проверка обычно стоит один 304 без тела. */
     res.setHeader('Cache-Control', 'no-cache')
+    /* SEO: сервер вписывает в index.html настоящие title / description /
+       canonical / og:* и JSON-LD для конкретного маршрута (server/seo.js).
+       Роботы и превью мессенджеров, не исполняющие JS, видят те же
+       метаданные, что и браузер после гидратации. Если подстановка по
+       какой-то причине не удалась — отдаём файл как раньше: сайт важнее SEO. */
+    try {
+      const html = renderPage(siteOrigin(req), req.path)
+      if (html) return res.status(status).type('html').send(html)
+    } catch (e) {
+      console.error('seo: подстановка метаданных не удалась:', e.message)
+    }
     res.status(status).sendFile(join(DIST, 'index.html'))
   })
 }

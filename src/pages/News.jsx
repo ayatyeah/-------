@@ -7,8 +7,9 @@ import usePageMeta from '../hooks/usePageMeta'
 
 export default function News() {
   usePageMeta({
-    title: 'Новости и статьи',
-    description: 'Новости производства, обновления модельного ряда и разборы по субсидиям и лизингу.',
+    title: 'Новости и статьи о сельхозтехнике',
+    description:
+      'Новости завода СХМ Агро, обновления модельного ряда сельхозтехники, разборы по субсидиям и лизингу для аграриев Казахстана.',
   })
   const { data, loading, error, reload } = useFetch(() => api.news(), [])
   const items = data ?? []

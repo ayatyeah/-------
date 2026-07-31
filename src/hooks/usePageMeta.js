@@ -43,12 +43,15 @@ function linkCanonical() {
 /**
  * @param {object} opts
  * @param {string} opts.title     — заголовок вкладки (без «— ТОО «СХМ Агро»»)
+ * @param {string} [opts.fullTitle] — готовый заголовок как есть, без приписки
+ *   бренда. Нужен главной: там бренд стоит в начале («СХМ Агро — …»), и
+ *   приписка в конце дала бы его дважды.
  * @param {string} [opts.description]
  * @param {boolean} [opts.noindex] — закрыть страницу от поисковиков
  */
-export default function usePageMeta({ title, description, noindex = false } = {}) {
+export default function usePageMeta({ title, fullTitle, description, noindex = false } = {}) {
   useEffect(() => {
-    const full = title ? `${title} — ${BASE_TITLE}` : BASE_TITLE
+    const full = fullTitle || (title ? `${title} — ${BASE_TITLE}` : BASE_TITLE)
     document.title = full
     meta('property', 'og:title').setAttribute('content', full)
 
@@ -69,5 +72,5 @@ export default function usePageMeta({ title, description, noindex = false } = {}
     } else if (robots) {
       robots.remove()
     }
-  }, [title, description, noindex])
+  }, [title, fullTitle, description, noindex])
 }

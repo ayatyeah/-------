@@ -7,8 +7,9 @@ import usePageMeta from '../hooks/usePageMeta'
 
 export default function Contacts() {
   usePageMeta({
-    title: 'Контакты',
-    description: 'Адрес, телефон и почта ТОО «СХМ Агро». Оставьте заявку — перезвоним в рабочее время.',
+    title: 'Контакты завода сельхозтехники',
+    description:
+      'Адрес, телефон и почта ТОО «СХМ Агро» — купить сельхозтехнику в Казахстане. Оставьте заявку — перезвоним в рабочее время.',
   })
   const { settings, showToast, openCall } = useSite()
   const [sending, setSending] = useState(false)
