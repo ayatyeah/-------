@@ -180,6 +180,15 @@ const limitAnalyze = rateLimit({
   message: 'Анализ уже запускался. Подождите минуту.',
 })
 
+// Маячок визита шлётся раз за вкладку (см. src/App.jsx), но лимит всё равно
+// свой и пожёстче общего — это просто счётчик, накручивать его скриптом
+// не должно быть даже немного удобнее, чем читать каталог.
+const limitVisit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Слишком часто.',
+})
+
 /* Общий потолок на всё API.
    Дыра, которая закрывается: точечные лимиты стояли только на входе,
    заявках и ИИ. Открытые GET (/api/models, /api/home, /api/sitemap) были
@@ -670,6 +679,13 @@ app.delete('/api/news/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
 
 app.get('/api/requests', requireAdmin, wrap((_req, res) => res.json(store.requests.all())))
 
+/* Публичный маячок посещения — считает визиты для сводки в админке. Никаких
+   адресов, идентификаторов или cookie не пишем, только +1 к счётчику дня. */
+app.post('/api/visit', limitVisit, wrap((_req, res) => {
+  store.visits.bump()
+  res.status(204).end()
+}))
+
 // Публичный: формы КП / звонка / обратной связи. Открыт всему интернету,
 // поэтому здесь и ограничитель частоты, и обрезка полей по длине.
 app.post('/api/requests', limitRequests, wrap(async (req, res) => {
@@ -1031,13 +1047,17 @@ app.post('/api/ai/chat', limitChat, wrap(async (req, res) => {
 
 /* -------------------------------- сводка ------------------------------- */
 
-app.get('/api/admin/summary', requireAdmin, wrap((_req, res) => {
+app.get('/api/admin/summary', requireAdmin, wrap((req, res) => {
   const requests = store.requests.all()
   res.json({
     models: store.models.all({ includeUnpublished: true }).length,
     news: store.news.all({ includeUnpublished: true }).length,
     requests: requests.length,
     newRequests: requests.filter((r) => r.status === 'Новая').length,
+    // Помесячный дашборд: по умолчанию текущий месяц, ?month=YYYY-MM — любой
+    // другой из тех, где вообще есть данные (см. availableMonths).
+    availableMonths: store.dashboard.availableMonths(),
+    dashboard: store.dashboard.forMonth(req.query.month),
   })
 }))
 

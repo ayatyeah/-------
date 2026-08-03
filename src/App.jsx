@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { SiteProvider, useSite } from './store'
+import { api } from './api'
 import { useHiddenOnScrollDown } from './hooks/useMotion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -62,6 +63,17 @@ function Shell() {
   const isAdmin = pathname.startsWith('/admin')
   // Пока листают вниз — прячем стопку, чтобы не закрывала текст.
   const stackHidden = useHiddenOnScrollDown()
+
+  /* Счётчик визитов для сводки в админке: один раз за вкладку браузера. Флаг
+     в sessionStorage ставим сразу при первой отрисовке, независимо от того,
+     какая страница открылась первой, — а сам маячок шлём, только если это
+     не админка. Так сотрудник, зашедший сразу в /admin, а потом заглянувший
+     на публичные страницы в той же вкладке, не досчитывается как визит. */
+  useEffect(() => {
+    if (sessionStorage.getItem('shm_visited')) return
+    sessionStorage.setItem('shm_visited', '1')
+    if (!isAdmin) api.visit().catch(() => {})
+  }, [isAdmin])
 
   return (
     <div className="app">

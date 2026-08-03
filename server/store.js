@@ -211,6 +211,11 @@ function freshData() {
        меняют через админку; до этого вход работает по ADMIN_PASSWORD. */
     auth: {},
     aiCache: {},
+    /* Визиты по дням: { '2026-08-03': 14, ... }. Только счётчик, без адресов
+       и идентификаторов посетителей — для сводки в админке этого достаточно,
+       а хранить что-то более подробное означало бы собирать персональные
+       данные без нужды. */
+    visits: {},
   }
 }
 
@@ -851,6 +856,11 @@ export const requests = {
     const r = {
       id: newId('r'),
       date: today(),
+      // Полное время создания — отдельно от даты (see date): по нему считаем
+      // среднее время обработки в сводке админки, дата нужна только для
+      // группировки по дню и отображения.
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
       type: type === 'КП' ? 'КП' : 'Звонок',
       fio,
       phone,
@@ -880,6 +890,10 @@ export const requests = {
     const r = data.requests.find((x) => x.id === id)
     if (!r) return null
     r.status = status
+    // «Обработана» — фиксируем момент, чтобы считать среднее время
+    // обработки; уйдя со статуса обратно, отметку снимаем — заявка ещё не
+    // закрыта, и старая отметка только исказила бы среднее.
+    r.resolvedAt = status === 'Обработана' ? new Date().toISOString() : null
     save()
     return clone(r)
   },
@@ -889,6 +903,87 @@ export const requests = {
     data.requests.splice(i, 1)
     save()
     return true
+  },
+}
+
+/* -------------------------------- визиты ---------------------------------- */
+
+export const visits = {
+  /** Один визит сайта — плюс один к счётчику текущего дня. */
+  bump() {
+    const d = today()
+    data.visits[d] = (data.visits[d] || 0) + 1
+    // Держим не больше ~15 месяцев истории: старше сводке уже не нужно,
+    // а без потолка счётчик рос бы вечно, по записи в день.
+    const days = Object.keys(data.visits)
+    if (days.length > 450) {
+      days.sort()
+      for (const key of days.slice(0, days.length - 450)) delete data.visits[key]
+    }
+    save()
+  },
+  all: () => clone(data.visits),
+}
+
+/* -------------------------------- сводка ----------------------------------- */
+
+const STATUS_LIST = ['Новая', 'В работе', 'Обработана']
+
+/** Сводка админки за календарный месяц (YYYY-MM). */
+export const dashboard = {
+  forMonth(month) {
+    const m = /^\d{4}-\d{2}$/.test(month || '') ? month : today().slice(0, 7)
+    const [y, mo] = m.split('-').map(Number)
+    const daysInMonth = new Date(y, mo, 0).getDate()
+    const days = Array.from({ length: daysInMonth }, (_, i) => `${m}-${String(i + 1).padStart(2, '0')}`)
+
+    const byDay = new Map(
+      days.map((d) => [d, { date: d, requests: 0, kp: 0, calls: 0, visits: data.visits[d] || 0 }])
+    )
+
+    const inMonth = data.requests.filter((r) => (r.date || '').startsWith(m))
+    const statusCounts = { 'Новая': 0, 'В работе': 0, 'Обработана': 0 }
+    for (const r of inMonth) {
+      const row = byDay.get(r.date)
+      if (row) {
+        row.requests += 1
+        if (r.type === 'КП') row.kp += 1
+        else row.calls += 1
+      }
+      if (STATUS_LIST.includes(r.status)) statusCounts[r.status] += 1
+    }
+
+    // Среднее время обработки — только по заявкам, у которых есть обе метки
+    // времени: старые заявки (созданные до этой правки) их не имеют и в
+    // среднее не попадают, а не искажают его нулём или ошибкой.
+    const resolved = inMonth.filter((r) => r.createdAt && r.resolvedAt)
+    const avgResolutionMs = resolved.length
+      ? Math.round(
+          resolved.reduce((sum, r) => sum + (new Date(r.resolvedAt) - new Date(r.createdAt)), 0) /
+            resolved.length
+        )
+      : null
+
+    return {
+      month: m,
+      days: [...byDay.values()],
+      requests: inMonth.length,
+      kp: inMonth.filter((r) => r.type === 'КП').length,
+      calls: inMonth.filter((r) => r.type === 'Звонок').length,
+      visits: days.reduce((sum, d) => sum + (data.visits[d] || 0), 0),
+      avgResolutionMs,
+      resolvedCount: resolved.length,
+      statusCounts,
+    }
+  },
+
+  /** Месяцы, за которые вообще есть хоть какие-то данные — плюс текущий,
+      чтобы в списке всегда было куда переключиться. */
+  availableMonths() {
+    const set = new Set([today().slice(0, 7)])
+    for (const r of data.requests) if (r.date) set.add(r.date.slice(0, 7))
+    for (const d of Object.keys(data.visits)) set.add(d.slice(0, 7))
+    return [...set].sort()
   },
 }
 

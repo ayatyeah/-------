@@ -47,6 +47,9 @@ export const api = {
 
   createRequest: (body) => request('/requests', { method: 'POST', body }),
 
+  /** Маячок визита — раз за вкладку браузера, см. src/App.jsx. */
+  visit: () => request('/visit', { method: 'POST' }),
+
   // --- ИИ ---
   ai: {
     /** Какой движок отвечает: gemini, openai или rules (правила без ИИ). */
@@ -58,7 +61,8 @@ export const api = {
 
   // --- админка ---
   admin: {
-    summary: () => request('/admin/summary', { auth: true }),
+    summary: (month) =>
+      request(`/admin/summary${month ? `?month=${encodeURIComponent(month)}` : ''}`, { auth: true }),
 
     models: () => request('/models?all=1', { auth: true }),
     createModel: (body) => request('/models', { method: 'POST', body, auth: true }),
