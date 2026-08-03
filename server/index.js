@@ -1015,14 +1015,18 @@ app.post('/api/ai/chat', limitChat, wrap(async (req, res) => {
     }))
     .filter((h) => h.text)
 
+  // Язык интерфейса посетителя — чем отвечать. Что угодно, кроме трёх
+  // известных значений, тихо превращаем в русский, а не пробрасываем как есть.
+  const lang = ['ru', 'kk', 'en'].includes(req.body?.lang) ? req.body.lang : 'ru'
+
   /* Бюджет кончился — не отказываем посетителю, а отвечаем по правилам.
      Чат на главной открыт всем, и «сервис недоступен» на живом сайте
      выглядит как поломка. Правила отвечают хуже, но отвечают. */
   if (aiBudgetLeft() <= 0) {
-    return res.json({ ...(await ai.chat(message, history, { rulesOnly: true })), engine: 'rules' })
+    return res.json({ ...(await ai.chat(message, history, { rulesOnly: true, lang })), engine: 'rules' })
   }
   aiBudgetTake()
-  res.json(await ai.chat(message, history))
+  res.json(await ai.chat(message, history, { lang }))
 }))
 
 /* -------------------------------- сводка ------------------------------- */

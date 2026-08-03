@@ -51,7 +51,8 @@ export const api = {
   ai: {
     /** Какой движок отвечает: gemini, openai или rules (правила без ИИ). */
     status: () => request('/ai/status'),
-    chat: (message, history) => request('/ai/chat', { method: 'POST', body: { message, history } }),
+    chat: (message, history, lang) =>
+      request('/ai/chat', { method: 'POST', body: { message, history, lang } }),
     analyzeLeads: () => request('/ai/analyze-leads', { method: 'POST', auth: true }),
   },
 

@@ -15,7 +15,7 @@ import { useT } from '../i18n'
 const SUGGESTION_KEYS = ['ai_sugg_1', 'ai_sugg_2', 'ai_sugg_3', 'ai_sugg_4']
 
 export default function AiChat() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [open, setOpen] = useState(false)
   /* Приветствие кладём при первом рендере на текущем языке. Уже начатую
      переписку при смене языка не переписываем — реплики пользователя и ИИ
@@ -63,7 +63,7 @@ export default function AiChat() {
     setInput('')
     setBusy(true)
     try {
-      const res = await api.ai.chat(msg, history)
+      const res = await api.ai.chat(msg, history, lang)
       setEngine(res.engine)
       setMessages((p) => [...p, { role: 'assistant', text: res.reply }])
     } catch (e) {
