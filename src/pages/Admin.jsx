@@ -15,6 +15,7 @@ import {
   BackupPanel,
 } from '../components/AdminPanels'
 import Icon from '../components/Icon'
+import { LineChart, StackedBarChart, Donut } from '../components/Charts'
 import usePageMeta from '../hooks/usePageMeta'
 
 const TABS = [
@@ -91,8 +92,135 @@ function Login({ onDone }) {
 
 /* ----------------------------- вкладка: сводка --------------------------- */
 
-function SummaryTab({ summary, requests, onGoTab }) {
-  const cards = [
+/** «5820000» мс → «1 дн 14 ч»/«2 ч 30 мин»/«12 мин». */
+function formatDuration(ms) {
+  if (ms == null) return '—'
+  const totalMin = Math.round(ms / 60000)
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const min = totalMin % 60
+  if (days > 0) return `${days} дн ${hours} ч`
+  if (hours > 0) return `${hours} ч ${min} мин`
+  return `${min} мин`
+}
+
+/** «2026-08» → «Август 2026». */
+function monthLabel(m) {
+  const [y, mo] = m.split('-').map(Number)
+  const s = new Date(y, mo - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** «2026-08» ± 1 месяц → «2026-09» / «2026-07», с переходом через год. */
+function shiftMonth(m, delta) {
+  const [y, mo] = m.split('-').map(Number)
+  const d = new Date(y, mo - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Помесячный дашборд: KPI-карточки и графики. Диапазон месяцев, между
+ * которыми можно переключаться, приходит от сервера (availableMonths) —
+ * там же, где реально есть данные (заявки или визиты), плюс текущий месяц.
+ */
+function DashboardSection({ summary, onMonthChange }) {
+  const [busy, setBusy] = useState(false)
+  const dash = summary?.dashboard
+  const months = summary?.availableMonths || []
+  if (!dash) return null
+
+  const idx = months.indexOf(dash.month)
+  const canPrev = idx > 0
+  const canNext = idx !== -1 && idx < months.length - 1
+
+  const go = async (delta) => {
+    setBusy(true)
+    try {
+      await onMonthChange(shiftMonth(dash.month, delta))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const days = dash.days
+  const dayLabels = days.map((d) => String(Number(d.date.slice(-2))))
+
+  const kpis = [
+    { v: dash.requests, k: 'заявок за месяц' },
+    { v: dash.kp, k: 'запросов КП' },
+    { v: dash.calls, k: 'заявок на звонок' },
+    { v: dash.visits, k: 'визитов на сайт' },
+    {
+      v: formatDuration(dash.avgResolutionMs),
+      k: `среднее время обработки${dash.resolvedCount ? ` (${dash.resolvedCount})` : ''}`,
+      small: true,
+    },
+  ]
+
+  return (
+    <>
+      <div className="dash-nav">
+        <button type="button" className="btn btn-ghost btn-sm" disabled={!canPrev || busy} onClick={() => go(-1)}>
+          ← Пред. месяц
+        </button>
+        <h3>{monthLabel(dash.month)}</h3>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={!canNext || busy} onClick={() => go(1)}>
+          След. месяц →
+        </button>
+      </div>
+
+      <div className="admin-cards" style={{ opacity: busy ? 0.6 : 1 }}>
+        {kpis.map((c) => (
+          <div className="admin-card" key={c.k}>
+            <div className="admin-card-v" style={c.small ? { fontSize: 23 } : undefined}>
+              {c.v}
+            </div>
+            <div className="admin-card-k">{c.k}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="dash-charts" style={{ opacity: busy ? 0.6 : 1 }}>
+        <div className="admin-panel dash-chart-card">
+          <h4>Визиты по дням</h4>
+          <LineChart values={days.map((d) => d.visits)} labels={dayLabels} color="var(--brass-500)" />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>Заявки по дням</h4>
+          <StackedBarChart
+            rows={days}
+            keys={['kp', 'calls']}
+            colors={['var(--green-600)', 'var(--brass-500)']}
+            labels={dayLabels}
+          />
+          <div className="chart-legend">
+            <span>
+              <i style={{ background: 'var(--green-600)' }} /> КП
+            </span>
+            <span>
+              <i style={{ background: 'var(--brass-500)' }} /> Звонок
+            </span>
+          </div>
+        </div>
+
+        <div className="admin-panel dash-chart-card dash-chart-card--donut">
+          <h4>Статусы заявок за месяц</h4>
+          <Donut
+            segments={[
+              { label: 'Новая', value: dash.statusCounts['Новая'] || 0, color: 'var(--green-400)' },
+              { label: 'В работе', value: dash.statusCounts['В работе'] || 0, color: 'var(--brass-400)' },
+              { label: 'Обработана', value: dash.statusCounts['Обработана'] || 0, color: 'var(--green-800)' },
+            ]}
+          />
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SummaryTab({ summary, requests, onGoTab, onMonthChange }) {
+  const totals = [
     { v: summary?.models ?? '—', k: 'моделей в каталоге', tab: 'catalog' },
     { v: summary?.news ?? '—', k: 'статей и новостей', tab: 'news' },
     { v: summary?.requests ?? '—', k: 'заявок всего', tab: 'requests' },
@@ -106,12 +234,12 @@ function SummaryTab({ summary, requests, onGoTab }) {
       <div className="admin-head">
         <div>
           <h1>Сводка</h1>
-          <p className="admin-hint">Текущее состояние сайта и последние заявки.</p>
+          <p className="admin-hint">Текущее состояние сайта, помесячная аналитика и последние заявки.</p>
         </div>
       </div>
 
       <div className="admin-cards">
-        {cards.map((c) => (
+        {totals.map((c) => (
           <button
             type="button"
             className="admin-card"
@@ -125,7 +253,9 @@ function SummaryTab({ summary, requests, onGoTab }) {
         ))}
       </div>
 
-      <h3 style={{ fontSize: 19, marginBottom: 14 }}>Последние заявки</h3>
+      <DashboardSection summary={summary} onMonthChange={onMonthChange} />
+
+      <h3 style={{ fontSize: 19, marginBottom: 14, marginTop: 8 }}>Последние заявки</h3>
       {latest.length === 0 ? (
         <EmptyState title="Заявок пока нет" />
       ) : (
@@ -143,15 +273,15 @@ function SummaryTab({ summary, requests, onGoTab }) {
             <tbody>
               {latest.map((r) => (
                 <tr key={r.id}>
-                  <td>{formatDateShort(r.date)}</td>
-                  <td>
+                  <td data-label="Дата">{formatDateShort(r.date)}</td>
+                  <td data-label="Тип">
                     <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>
                       {r.type}
                     </span>
                   </td>
-                  <td>{r.fio}</td>
-                  <td>{r.phone}</td>
-                  <td>
+                  <td className="card-title">{r.fio}</td>
+                  <td data-label="Телефон">{r.phone}</td>
+                  <td data-label="Статус">
                     <span className={`tag ${r.status === 'Новая' ? 'tag-green' : 'tag-muted'}`}>
                       {r.status}
                     </span>
@@ -240,7 +370,7 @@ function CatalogTab({ models, cats, reload }) {
             <tbody>
               {models.map((m, i) => (
                 <tr key={m.id}>
-                  <td>
+                  <td className="card-order">
                     <div className="spec-move">
                       <button
                         type="button"
@@ -260,24 +390,24 @@ function CatalogTab({ models, cats, reload }) {
                       </button>
                     </div>
                   </td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="card-title" style={{ fontWeight: 500 }}>
                     {m.photo && <img src={m.photo} alt="" className="admin-thumb" />}
                     {m.name}
                   </td>
-                  <td style={{ color: 'var(--text-2)' }}>{m.catName}</td>
-                  <td>
+                  <td data-label="Категория" style={{ color: 'var(--text-2)' }}>{m.catName}</td>
+                  <td data-label="Субсидия">
                     {m.subsidized ? (
                       <span className="tag tag-brass">Да</span>
                     ) : (
                       <span className="tag tag-muted">Нет</span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Статус">
                     <span className={`tag ${m.published ? 'tag-green' : 'tag-outline'}`}>
                       {m.published ? 'Опубликовано' : 'Черновик'}
                     </span>
                   </td>
-                  <td>
+                  <td className="card-actions">
                     <div className="row-actions">
                       <button
                         type="button"
@@ -382,16 +512,16 @@ function NewsTab({ news, reload }) {
             <tbody>
               {news.map((n) => (
                 <tr key={n.id}>
-                  <td style={{ fontWeight: 500 }}>{n.title}</td>
-                  <td style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                  <td className="card-title" style={{ fontWeight: 500 }}>{n.title}</td>
+                  <td data-label="Дата" style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
                     {formatDateShort(n.date)}
                   </td>
-                  <td>
+                  <td data-label="Статус">
                     <span className={`tag ${n.published ? 'tag-green' : 'tag-outline'}`}>
                       {n.published ? 'Опубликовано' : 'Черновик'}
                     </span>
                   </td>
-                  <td>
+                  <td className="card-actions">
                     <div className="row-actions">
                       <button
                         type="button"
@@ -618,13 +748,13 @@ function RequestsTab({ requests, reload }) {
             <tbody>
               {requests.map((r) => (
                 <tr key={r.id} className={scored[r.id] ? `row-${prioClass(scored[r.id].priority)}` : ''}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatDateShort(r.date)}</td>
-                  <td>
+                  <td data-label="Дата" style={{ whiteSpace: 'nowrap' }}>{formatDateShort(r.date)}</td>
+                  <td data-label="Тип">
                     <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>
                       {r.type}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="card-title" style={{ fontWeight: 500 }}>
                     {r.fio}
                     {/* Доказательство согласия на обработку данных: когда его
                         дали и с какой редакцией политики. Если человек
@@ -635,7 +765,7 @@ function RequestsTab({ requests, reload }) {
                       </div>
                     )}
                   </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
+                  <td data-label="Телефон" style={{ whiteSpace: 'nowrap' }}>
                     <a
                       href={`tel:${r.phone.replace(/\s/g, '')}`}
                       style={{ borderBottom: '1px solid var(--rule-strong)' }}
@@ -643,7 +773,7 @@ function RequestsTab({ requests, reload }) {
                       {r.phone}
                     </a>
                   </td>
-                  <td style={{ color: 'var(--text-2)' }}>
+                  <td data-label="Модель / регион" style={{ color: 'var(--text-2)' }}>
                     {r.meta}
                     {r.comment && (
                       <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
@@ -651,7 +781,7 @@ function RequestsTab({ requests, reload }) {
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Статус">
                     <select
                       className="input"
                       style={{ minWidth: 130, padding: '7px 9px' }}
@@ -663,7 +793,7 @@ function RequestsTab({ requests, reload }) {
                       ))}
                     </select>
                   </td>
-                  <td>
+                  <td className="card-actions">
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -929,6 +1059,13 @@ export default function Admin() {
     if (authed) load()
   }, [authed, load])
 
+  // Переключение месяца в дашборде сводки: тянет только summary, а не весь
+  // набор данных админки заново — каталог и заявки от месяца не зависят.
+  const loadSummaryMonth = useCallback(async (month) => {
+    const s = await api.admin.summary(month)
+    setSummary(s)
+  }, [])
+
   const logout = () => {
     clearToken()
     setAuthed(false)
@@ -997,7 +1134,12 @@ export default function Admin() {
         {!loading && !error && (
           <>
             {tab === 'summary' && (
-              <SummaryTab summary={summary} requests={requests} onGoTab={setTab} />
+              <SummaryTab
+                summary={summary}
+                requests={requests}
+                onGoTab={setTab}
+                onMonthChange={loadSummaryMonth}
+              />
             )}
             {tab === 'catalog' && <CatalogTab models={models} cats={cats} reload={load} />}
             {tab === 'services' && <ServicesPanel services={services} reload={load} />}

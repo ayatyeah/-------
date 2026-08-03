@@ -208,17 +208,17 @@ export function CategoriesPanel({ cats, models, reload }) {
           <tbody>
             {cats.map((c, i) => (
               <tr key={c.id}>
-                <td>
+                <td className="card-order">
                   <MoveButtons index={i} total={cats.length} onMove={move} />
                 </td>
-                <td style={{ fontWeight: 500 }}>{c.name}</td>
-                <td>
+                <td className="card-title" style={{ fontWeight: 500 }}>{c.name}</td>
+                <td data-label="Значок">
                   <Icon name={c.icon || 'gear'} size={20} />
                 </td>
-                <td style={{ color: 'var(--text-2)' }}>
+                <td data-label="Моделей" style={{ color: 'var(--text-2)' }}>
                   {models.filter((m) => m.cat === c.id).length}
                 </td>
-                <td>
+                <td className="card-actions">
                   <div className="row-actions">
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => open(c)}>
                       Изм.
@@ -364,17 +364,17 @@ export function ServicesPanel({ services, reload }) {
           <tbody>
             {services.map((s, i) => (
               <tr key={s.id}>
-                <td>
+                <td className="card-order">
                   <MoveButtons index={i} total={services.length} onMove={move} />
                 </td>
-                <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+                <td className="card-title" style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
                   <Icon name={s.icon || 'gear'} size={16} /> {s.title}
                 </td>
-                <td style={{ color: 'var(--text-2)', fontSize: 14, maxWidth: 420 }}>{s.text}</td>
-                <td style={{ color: 'var(--text-3)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                <td data-label="Описание" style={{ color: 'var(--text-2)', fontSize: 14, maxWidth: 420 }}>{s.text}</td>
+                <td data-label="Подпись" style={{ color: 'var(--text-3)', fontSize: 13, whiteSpace: 'nowrap' }}>
                   {s.note}
                 </td>
-                <td>
+                <td className="card-actions">
                   <div className="row-actions">
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => open(s)}>
                       Изм.
