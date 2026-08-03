@@ -8,8 +8,16 @@ export const reducedMotion = () =>
 /**
  * Появление при попадании в вьюпорт — на IntersectionObserver,
  * без слушателей скролла и без лишних перерисовок.
- */
-export function useReveal({ threshold = 0.12, once = true } = {}) {
+ *
+ * timeout — подстраховка сверх наблюдателя (мс). Без нужды не задаётся:
+ * обычные карточки/заголовки честно ждут скролла. Но у элемента, который
+ * должен быть виден сразу при открытии страницы (главное фото — LCP),
+ * навсегда остаться невидимым из-за браузерной особенности хуже, чем
+ * потерять анимацию появления. IntersectionObserver в редких случаях
+ * может не отработать вовремя по причинам вне нашего контроля (свёрнутая
+   вкладка при загрузке, экономия энергии и т.п.) — таймаут гарантирует,
+ * что контент рано или поздно покажется в любом случае. */
+export function useReveal({ threshold = 0.12, once = true, timeout = 0 } = {}) {
   const ref = useRef(null)
   const [shown, setShown] = useState(false)
 
@@ -35,8 +43,12 @@ export function useReveal({ threshold = 0.12, once = true } = {}) {
     )
 
     io.observe(el)
-    return () => io.disconnect()
-  }, [threshold, once])
+    const fallback = timeout ? setTimeout(() => setShown(true), timeout) : null
+    return () => {
+      io.disconnect()
+      if (fallback) clearTimeout(fallback)
+    }
+  }, [threshold, once, timeout])
 
   return [ref, shown]
 }
