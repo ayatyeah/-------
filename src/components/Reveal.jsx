@@ -4,6 +4,19 @@ import { useReveal, reducedMotion } from '../hooks/useReveal'
 /**
  * Обёртка появления: снизу вверх с затуханием.
  * variant: 'up' | 'left' | 'right' | 'fade' | 'clip'
+ *
+ * 'clip' устроен иначе остальных: clip-path висит не на самом
+ * наблюдаемом элементе, а на внутренней обёртке. У полностью
+ * заклипанного элемента (clip-path: inset(0 0 100% 0) — видимая высота
+ * ровно 0) Chromium сам же считает пересечение с вьюпортом нулевым, а
+ * IntersectionObserver — не пересекающимся. Получался замкнутый круг:
+ * элемент невидим, пока не подтверждено пересечение, а пересечение не
+ * подтверждается, пока элемент невидим. Раз на раз срабатывало (первый
+ * тик наблюдателя иногда успевал проскочить до применения clip-path),
+ * а не работало — так и осталось скрытым навсегда: именно это
+ * происходило с главным фото на карточке модели и на главной. Вынося
+ * clip-path на дочерний div, сам наблюдаемый элемент остаётся обычной
+ * непрозрачной коробкой, и IntersectionObserver видит его нормально.
  */
 export default function Reveal({
   as: Tag = 'div',
@@ -14,6 +27,19 @@ export default function Reveal({
   ...rest
 }) {
   const [ref, shown] = useReveal()
+
+  if (variant === 'clip') {
+    return (
+      <Tag
+        ref={ref}
+        className={`reveal reveal--clip-outer${shown ? ' is-in' : ''} ${className}`.trim()}
+        style={{ transitionDelay: `${delay}ms` }}
+        {...rest}
+      >
+        <div className="reveal-clip-inner">{children}</div>
+      </Tag>
+    )
+  }
 
   return (
     <Tag

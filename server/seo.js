@@ -133,7 +133,14 @@ function routeMeta(path, origin) {
     })),
   })
 
-  const base = { keywords: null, image: abs('/assets/hero-field.webp'), ld: [organization, website], noindex: false }
+  // Фото на превью в мессенджерах — то же, что видит посетитель на главной:
+  // редактируется в админке, дефолт — снимок из комплекта сайта.
+  const base = {
+    keywords: null,
+    image: abs(s.hero_photo || '/assets/hero-field.webp'),
+    ld: [organization, website],
+    noindex: false,
+  }
 
   // Карточка техники: /catalog/:id → schema.org/Product.
   if (path.startsWith('/catalog/') && path.length > '/catalog/'.length) {
@@ -147,7 +154,11 @@ function routeMeta(path, origin) {
       '@type': 'Product',
       name: m.name,
       description: clip(m.descr || m.short, 300),
-      ...(m.photo ? { image: abs(m.photo) } : {}),
+      // Главное фото — первым: некоторые агрегаторы берут для сниппета
+      // только image[0], а не любое из списка.
+      ...(m.photo || m.gallery?.length
+        ? { image: [m.photo, ...(m.gallery || [])].filter(Boolean).map(abs) }
+        : {}),
       url: origin + '/catalog/' + m.id,
       brand: { '@type': 'Brand', name: 'СХМ Агро' },
       manufacturer: { '@id': origin + '/#organization' },

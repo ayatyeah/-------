@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useFetch, useSite } from '../store'
@@ -8,8 +8,6 @@ import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
 
-const VIEW_KEYS = ['view_1', 'view_2', 'view_3', 'view_4']
-
 export default function ModelPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -17,6 +15,15 @@ export default function ModelPage() {
   const { t, td } = useT()
   const tiltRef = useTilt(7)
   const { data: m, loading, error, reload } = useFetch(() => api.model(id), [id])
+
+  // Какое фото сейчас крупно: по умолчанию главное, миниатюра меняет его
+  // без перехода на другую страницу. Сбрасываем на главное при смене
+  // модели — иначе после перехода «назад → другая модель» могло остаться
+  // выбранным фото из предыдущей карточки.
+  const photos = m ? [m.photo, ...(m.gallery || [])].filter(Boolean) : []
+  const [shown, setShown] = useState(null)
+  useEffect(() => setShown(null), [id])
+  const active = shown && photos.includes(shown) ? shown : photos[0]
 
   // Пока модель грузится — общий заголовок; загрузилась — её имя и краткое
   // описание. Ошибка/не найдено закрываем от индексации.
@@ -63,18 +70,28 @@ export default function ModelPage() {
         <div>
           <Reveal variant="clip">
             <figure className="model-hero tilt" ref={tiltRef}>
-              <Media src={m.photo} alt={m.name} stub={`${m.name} · ${t('photo')}`} />
+              <Media src={active} alt={m.name} stub={`${m.name} · ${t('photo')}`} priority />
             </figure>
           </Reveal>
-          <div className="model-thumbs">
-            {VIEW_KEYS.map((v, i) => (
-              <Reveal className="model-thumb" key={v} delay={i * 80}>
-                <div className="media-stub">
-                  <span>{t(v)}</span>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          {/* Строка миниатюр — только когда есть что переключать: одно
+              единственное фото под тем же фото ничего не добавляет. */}
+          {photos.length > 1 && (
+            <div className="model-thumbs">
+              {photos.map((p, i) => (
+                <Reveal key={p} delay={i * 80}>
+                  <button
+                    type="button"
+                    className={`model-thumb${p === active ? ' is-active' : ''}`}
+                    onClick={() => setShown(p)}
+                    aria-label={`${t('photo')} ${i + 1}`}
+                    aria-current={p === active}
+                  >
+                    <img src={p} alt="" loading="lazy" />
+                  </button>
+                </Reveal>
+              ))}
+            </div>
+          )}
         </div>
 
         <Reveal variant="right" delay={100}>

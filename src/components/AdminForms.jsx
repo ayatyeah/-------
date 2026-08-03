@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Dialog } from './ui'
-import MediaPicker from './MediaPicker'
+import MediaPicker, { GalleryPicker } from './MediaPicker'
 
 /**
  * Редактор характеристик: пары «параметр — значение».
@@ -112,6 +112,7 @@ export function ModelForm({ model, cats, onSave, onClose }) {
     name: model?.name ?? '',
     cat: model?.cat ?? cats[0]?.id ?? '',
     photo: model?.photo ?? '',
+    gallery: model?.gallery ?? [],
     short: model?.short ?? '',
     descr: model?.descr ?? '',
     subsidized: model?.subsidized ?? false,
@@ -171,7 +172,11 @@ export function ModelForm({ model, cats, onSave, onClose }) {
           </select>
         </div>
 
-        <MediaPicker value={f.photo} onChange={(v) => upd('photo', v)} label="Фотография модели" />
+        <GalleryPicker
+          value={[f.photo, ...f.gallery].filter(Boolean)}
+          onChange={(list) => setF((p) => ({ ...p, photo: list[0] || '', gallery: list.slice(1) }))}
+          label="Фотографии модели"
+        />
 
         <div className="field">
           <label htmlFor="m_short">Краткое описание</label>

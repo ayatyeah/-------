@@ -9,6 +9,7 @@ import {
   ServicesPanel,
   StatsPanel,
   CertsPanel,
+  PhotosPanel,
   RegionsPanel,
   PasswordPanel,
   BackupPanel,
@@ -866,6 +867,7 @@ function MainTab({ stats, certs, reload }) {
       </div>
 
       <div className="admin-settings">
+        <PhotosPanel />
         <StatsPanel stats={stats} reload={reload} />
         <CertsPanel certs={certs} reload={reload} />
       </div>

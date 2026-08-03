@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Icon from './Icon'
+import MediaPicker from './MediaPicker'
 
 /**
  * Панели админки, которых раньше не было вовсе.
@@ -595,6 +596,76 @@ export function CertsPanel({ certs, reload }) {
         reorder: api.admin.reorderCerts,
       }}
     />
+  )
+}
+
+/* ------------------------------- фото сайта ------------------------------- */
+
+/**
+ * Фото на главной и на странице «О компании». Раньше это были два файла,
+ * зашитых в код (/assets/hero-field.webp, /assets/tractor-green.webp) —
+ * заменить их мог только программист, через пересборку образа. Пустое
+ * поле не ломает страницу: сайт показывает снимок из комплекта.
+ */
+export function PhotosPanel() {
+  const { settings, setSettings, showToast } = useSite()
+  const [f, setF] = useState({
+    hero_photo: settings.hero_photo ?? '',
+    about_photo: settings.about_photo ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Настройки могут догрузиться после монтирования вкладки.
+  useEffect(() => {
+    setF({ hero_photo: settings.hero_photo ?? '', about_photo: settings.about_photo ?? '' })
+  }, [settings.hero_photo, settings.about_photo])
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    try {
+      const saved = await api.admin.saveSettings(f)
+      setSettings((prev) => ({ ...prev, ...saved }))
+      if (saved.rejected?.length) {
+        setError(`Не сохранено: ${saved.rejected.join(', ')} — проверьте, что фото выбрано через библиотеку.`)
+      } else {
+        showToast('Фото сохранены')
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+      <h3>Фото сайта</h3>
+      <p className="admin-hint" style={{ marginBottom: 12 }}>
+        Пустое поле — используется снимок из комплекта сайта, страница не ломается.
+      </p>
+      {error && <div className="form-error">{error}</div>}
+      <MediaPicker
+        value={f.hero_photo}
+        onChange={(v) => setF((p) => ({ ...p, hero_photo: v }))}
+        label="Фото на главной"
+      />
+      <MediaPicker
+        value={f.about_photo}
+        onChange={(v) => setF((p) => ({ ...p, about_photo: v }))}
+        label="Фото на странице «О компании»"
+      />
+      <button
+        type="button"
+        className="btn btn-secondary"
+        style={{ marginTop: 12 }}
+        onClick={save}
+        disabled={saving}
+      >
+        {saving ? 'Сохраняем…' : 'Сохранить фото'}
+      </button>
+    </div>
   )
 }
 

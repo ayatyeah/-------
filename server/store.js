@@ -84,6 +84,7 @@ const MAX = {
   list: 60, // элементов в справочниках (категории, услуги, показатели…)
   models: 500,
   news: 500,
+  gallery: 12, // дополнительных фото на модель, сверх главного
 }
 
 /**
@@ -150,6 +151,16 @@ const cleanSpecs = (list) =>
     .slice(0, MAX.specs)
     .map((s) => ({ k: str(s?.k, MAX.specKey), v: str(s?.v, MAX.specVal) }))
     .filter((s) => s.k || s.v)
+
+/** Дополнительные фото модели, сверх главного. Каждый путь проходит ту же
+    проверку, что и главное фото; мусор и дубли отбрасываем молча. */
+const cleanGallery = (list) => {
+  const seen = new Set()
+  return (Array.isArray(list) ? list : [])
+    .map(safeMedia)
+    .filter((p) => p && !seen.has(p) && seen.add(p))
+    .slice(0, MAX.gallery)
+}
 
 /** Абзацы статьи. */
 const cleanParagraphs = (list) =>
@@ -423,7 +434,9 @@ export const snapshot = () => {
 
 const clone = (v) => JSON.parse(JSON.stringify(v))
 const catName = (id) => data.categories.find((c) => c.id === id)?.name ?? ''
-const withCat = (m) => ({ ...clone(m), catName: catName(m.cat) })
+/* gallery появилось позже photo: у моделей, сохранённых до этой правки,
+   поля в файле нет вовсе — отдаём пустой массив, а не undefined. */
+const withCat = (m) => ({ ...clone(m), gallery: m.gallery || [], catName: catName(m.cat) })
 const bySort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0)
 
 /** Следующий номер в списке (новый элемент встаёт в конец). */
@@ -552,6 +565,7 @@ export const models = {
       name: str(body.name, MAX.name),
       cat: body.cat,
       photo: safeMedia(body.photo),
+      gallery: cleanGallery(body.gallery),
       short: str(body.short, MAX.short) || 'Новая модель (черновик).',
       descr: str(body.descr, MAX.descr) || 'Описание появится позже.',
       specs: cleanSpecs(body.specs),
@@ -569,6 +583,7 @@ export const models = {
     if (body.name !== undefined) m.name = str(body.name, MAX.name) || m.name
     if (body.cat !== undefined) m.cat = body.cat ?? m.cat
     if (body.photo !== undefined) m.photo = safeMedia(body.photo)
+    if (body.gallery !== undefined) m.gallery = cleanGallery(body.gallery)
     if (body.short !== undefined) m.short = str(body.short, MAX.short)
     if (body.descr !== undefined) m.descr = str(body.descr, MAX.descr)
     if (body.specs !== undefined) m.specs = cleanSpecs(body.specs)
@@ -588,7 +603,10 @@ export const models = {
   reorder: (ids) => applyOrder(data.models, ids),
 
   /** Пользуется ли кто-то этой картинкой — спрашивает библиотека медиа. */
-  usesPhoto: (path) => data.models.filter((m) => m.photo === path).map((m) => m.name),
+  usesPhoto: (path) =>
+    data.models
+      .filter((m) => m.photo === path || (m.gallery || []).includes(path))
+      .map((m) => m.name),
 }
 
 /* -------------------------------- новости ------------------------------- */
@@ -894,8 +912,14 @@ const SETTING_KEYS = [
   'whatsapp_url',
   'hero_title',
   'hero_subtitle',
+  'hero_photo',
+  'about_photo',
 ]
 const URL_KEYS = new Set(['leasing_url', 'subsidy_url', 'instagram_url', 'telegram_url', 'whatsapp_url'])
+/* Фото на главной и на странице «О компании» — не ссылка, а путь к своей
+   картинке (/assets/… из комплекта или /uploads/… из библиотеки), поэтому
+   проверяются той же safeMedia(), что и фото модели, а не safeUrl(). */
+const MEDIA_KEYS = new Set(['hero_photo', 'about_photo'])
 
 /** Ссылку принимаем только пустую или явный https:// — прочее (в т.ч.
     javascript:, data:, http://) отбрасываем в пустую строку. */
@@ -923,7 +947,13 @@ export const settings = {
         rejected.push(key)
         continue
       }
-      data.settings[key] = v
+      if (MEDIA_KEYS.has(key) && v && !safeMedia(v)) {
+        // Та же логика, что и для ссылок: битый путь не затирает фото,
+        // которое уже стоит на сайте, а просто не принимается.
+        rejected.push(key)
+        continue
+      }
+      data.settings[key] = MEDIA_KEYS.has(key) ? safeMedia(v) || '' : v
     }
     save()
     return { ...settings.publicAll(), rejected }

@@ -21,6 +21,14 @@ import { api } from '../api'
  * шести зависимостей). Браузер же умеет это сам: рисуем картинку на
  * canvas нужного размера и просим отдать WebP. Заказчик выбирает файл с
  * телефона как обычно и ни о чём не думает.
+ *
+ * ─── Один файл — два компонента ──────────────────────────────────────────
+ * MediaPicker выбирает одну картинку (обложка новости, сертификат и т.п.).
+ * GalleryPicker — набор картинок с главной первой (фото модели: одна
+ * обязательная, остальные по желанию). Оба открывают одну и ту же
+ * библиотеку — MediaLibraryDialog ниже, — только по-разному реагируют на
+ * выбор: MediaPicker подставляет и закрывается, GalleryPicker добавляет в
+ * список и оставляет диалог открытым, чтобы можно было закинуть ещё.
  */
 
 /** Максимальная сторона готовой картинки и качество сжатия. */
@@ -29,6 +37,9 @@ const QUALITY = 0.85
 
 /** Человекочитаемый размер файла. */
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.round(n / 1024)} КБ`)
+
+/** Снимки из комплекта сайта — доступны, даже если библиотека пуста. */
+const BUNDLED = ['/assets/tractor-green.webp', '/assets/combine-torum.webp', '/assets/hero-field.webp']
 
 /**
  * Ужимает выбранный файл до разумного размера.
@@ -74,8 +85,22 @@ const имяДляЗагрузки = (file, blob) =>
     ? file.name.replace(/\.[^.]+$/, '') + '.webp'
     : file.name
 
-export default function MediaPicker({ value, onChange, label = 'Фотография' }) {
-  const [open, setOpen] = useState(false)
+/**
+ * Библиотека фотографий: список загруженного + комплект сайта, загрузка
+ * новых файлов, удаление. Сама не хранит, что выбрано — сообщает о каждом
+ * клике через onPick и оставляет решение вызывающему.
+ *
+ * @param {string[]} selected — пути, уже стоящие у вызывающего (для рамки
+ *   вокруг уже выбранных карточек в сетке)
+ * @param {(path: string) => void} onPick — клик по карточке или успешная
+ *   загрузка файла
+ * @param {(path: string) => void} onDeleted — файл удалён из библиотеки:
+ *   вызывающий решает, убрать ли его из своего значения
+ * @param {boolean} closeOnPick — закрывать ли диалог сразу после выбора
+ *   (да для одиночной картинки, нет для галереи — там после каждого фото
+ *   логичнее остаться и докинуть ещё)
+ */
+function MediaLibraryDialog({ selected = [], onPick, onDeleted, onClose, closeOnPick = true }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -98,8 +123,8 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
   }, [])
 
   useEffect(() => {
-    if (open) загрузитьСписок()
-  }, [open, загрузитьСписок])
+    загрузитьСписок()
+  }, [загрузитьСписок])
 
   async function отправить(fileList) {
     const list = Array.from(fileList || []).filter((f) => f.type.startsWith('image/'))
@@ -110,17 +135,13 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
     setBusy(true)
     setError(null)
     try {
-      let последний = null
       for (const file of list) {
         const blob = await ужать(file)
-        последний = await api.admin.upload(blob, имяДляЗагрузки(file, blob))
+        const результат = await api.admin.upload(blob, имяДляЗагрузки(file, blob))
+        onPick(результат.path)
       }
       await загрузитьСписок()
-      // Только что загруженную сразу и ставим — обычно ради неё и заходили.
-      if (последний) {
-        onChange(последний.path)
-        setOpen(false)
-      }
+      if (closeOnPick) onClose()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -137,11 +158,16 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
     if (!confirm(вопрос)) return
     try {
       await api.admin.deleteUpload(f.name, !!занята)
-      if (value === f.path) onChange('')
+      onDeleted(f.path)
       await загрузитьСписок()
     } catch (e) {
       setError(e.message)
     }
+  }
+
+  function выбрать(path) {
+    onPick(path)
+    if (closeOnPick) onClose()
   }
 
   /* Перетаскивание файла в окно. Обработчики на самом блоке, а не на
@@ -152,6 +178,113 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
     dropRef.current?.classList.remove('is-over')
     отправить(e.dataTransfer.files)
   }
+
+  return (
+    <div className="media-lib" role="dialog" aria-label="Библиотека фотографий">
+      <div className="media-lib-head">
+        <b>Фотографии</b>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+          Закрыть
+        </button>
+      </div>
+
+      {error && <div className="form-error">{error}</div>}
+
+      <div
+        ref={dropRef}
+        className="media-drop"
+        onDragOver={(e) => {
+          e.preventDefault()
+          dropRef.current?.classList.add('is-over')
+        }}
+        onDragLeave={() => dropRef.current?.classList.remove('is-over')}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          hidden
+          onChange={(e) => отправить(e.target.files)}
+        />
+        {busy ? (
+          <span>Загружаем…</span>
+        ) : (
+          <>
+            <b>Перетащите фото сюда</b>
+            <span>или нажмите, чтобы выбрать на компьютере</span>
+            <small>
+              JPG, PNG, WebP или GIF. Крупные снимки уменьшаются автоматически — грузите
+              прямо с телефона.
+            </small>
+          </>
+        )}
+      </div>
+
+      {quota && (
+        <div className="media-quota">
+          Занято: {kb(quota.used)} из {kb(quota.total)}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="media-lib-note">Загружаем список…</div>
+      ) : files.length === 0 ? (
+        <div className="media-lib-note">Пока ничего не загружено.</div>
+      ) : (
+        <div className="media-grid">
+          {files.map((f) => (
+            <div key={f.name} className={`media-item${selected.includes(f.path) ? ' is-active' : ''}`}>
+              <button
+                type="button"
+                className="media-item-pick"
+                onClick={() => выбрать(f.path)}
+                title={f.title || f.name}
+              >
+                <img src={f.path} alt="" loading="lazy" />
+              </button>
+              <div className="media-item-foot">
+                <span title={f.usedBy?.length ? `Стоит в: ${f.usedBy.join(', ')}` : 'Нигде не используется'}>
+                  {f.usedBy?.length ? `в ${f.usedBy.length} карт.` : kb(f.size)}
+                </span>
+                <button
+                  type="button"
+                  className="media-item-del"
+                  onClick={() => удалить(f)}
+                  aria-label={`Удалить ${f.name}`}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="media-lib-note" style={{ marginTop: 10 }}>
+        Стандартные снимки из комплекта сайта остаются доступны, даже если библиотека пуста.
+      </div>
+      <div className="media-grid">
+        {BUNDLED.map((p) => (
+          <div key={p} className={`media-item${selected.includes(p) ? ' is-active' : ''}`}>
+            <button type="button" className="media-item-pick" onClick={() => выбрать(p)}>
+              <img src={p} alt="" loading="lazy" />
+            </button>
+            <div className="media-item-foot">
+              <span>из комплекта</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Одна картинка: обложка новости, сертификат и т.п. */
+export default function MediaPicker({ value, onChange, label = 'Фотография' }) {
+  const [open, setOpen] = useState(false)
 
   return (
     <div className="field">
@@ -171,11 +304,7 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
             {value ? 'Заменить' : 'Выбрать или загрузить'}
           </button>
           {value && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => onChange('')}
-            >
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange('')}>
               Убрать
             </button>
           )}
@@ -183,117 +312,88 @@ export default function MediaPicker({ value, onChange, label = 'Фотограф
       </div>
 
       {open && (
-        <div className="media-lib" role="dialog" aria-label="Библиотека фотографий">
-          <div className="media-lib-head">
-            <b>Фотографии</b>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
-              Закрыть
+        <MediaLibraryDialog
+          selected={value ? [value] : []}
+          onPick={onChange}
+          onDeleted={(path) => {
+            if (value === path) onChange('')
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Набор фотографий: первая — главная (та, что видна в каталоге, JSON-LD и
+ * везде, где карточке нужно ровно одно фото), остальные — по желанию.
+ * Хранится одним массивом путей, но наружу отдаётся как есть: разложить
+ * на «главное + остальные» — дело вызывающего (см. AdminForms.jsx).
+ */
+export function GalleryPicker({ value, onChange, label = 'Фотографии' }) {
+  const [open, setOpen] = useState(false)
+  const photos = value || []
+
+  const сделатьГлавной = (i) => {
+    if (i === 0) return
+    const next = [...photos]
+    const [item] = next.splice(i, 1)
+    next.unshift(item)
+    onChange(next)
+  }
+  const убрать = (i) => onChange(photos.filter((_, idx) => idx !== i))
+  const добавить = (path) => {
+    if (!photos.includes(path)) onChange([...photos, path])
+  }
+  const удалена = (path) => onChange(photos.filter((p) => p !== path))
+
+  return (
+    <div className="field">
+      <label>{label}</label>
+
+      <div className="gallery-pick">
+        {photos.map((p, i) => (
+          <div className={`gallery-pick-item${i === 0 ? ' is-main' : ''}`} key={p}>
+            <img src={p} alt="" />
+            <div className="gallery-pick-tag">
+              {i === 0 ? (
+                'Главное'
+              ) : (
+                <button type="button" onClick={() => сделатьГлавной(i)}>
+                  Сделать главной
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              className="gallery-pick-del"
+              onClick={() => убрать(i)}
+              aria-label="Убрать фото"
+            >
+              ✕
             </button>
           </div>
+        ))}
+        <button type="button" className="gallery-pick-add" onClick={() => setOpen(true)}>
+          + Добавить фото
+        </button>
+      </div>
 
-          {error && <div className="form-error">{error}</div>}
+      {photos.length === 0 && (
+        <p className="admin-hint" style={{ marginTop: 8 }}>
+          Фото не выбраны. Первое добавленное станет главным — его увидят в каталоге.
+        </p>
+      )}
 
-          <div
-            ref={dropRef}
-            className="media-drop"
-            onDragOver={(e) => {
-              e.preventDefault()
-              dropRef.current?.classList.add('is-over')
-            }}
-            onDragLeave={() => dropRef.current?.classList.remove('is-over')}
-            onDrop={onDrop}
-            onClick={() => inputRef.current?.click()}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              hidden
-              onChange={(e) => отправить(e.target.files)}
-            />
-            {busy ? (
-              <span>Загружаем…</span>
-            ) : (
-              <>
-                <b>Перетащите фото сюда</b>
-                <span>или нажмите, чтобы выбрать на компьютере</span>
-                <small>
-                  JPG, PNG, WebP или GIF. Крупные снимки уменьшаются автоматически — грузите
-                  прямо с телефона.
-                </small>
-              </>
-            )}
-          </div>
-
-          {quota && (
-            <div className="media-quota">
-              Занято: {kb(quota.used)} из {kb(quota.total)}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="media-lib-note">Загружаем список…</div>
-          ) : files.length === 0 ? (
-            <div className="media-lib-note">Пока ничего не загружено.</div>
-          ) : (
-            <div className="media-grid">
-              {files.map((f) => (
-                <div key={f.name} className={`media-item${value === f.path ? ' is-active' : ''}`}>
-                  <button
-                    type="button"
-                    className="media-item-pick"
-                    onClick={() => {
-                      onChange(f.path)
-                      setOpen(false)
-                    }}
-                    title={f.title || f.name}
-                  >
-                    <img src={f.path} alt="" loading="lazy" />
-                  </button>
-                  <div className="media-item-foot">
-                    <span title={f.usedBy?.length ? `Стоит в: ${f.usedBy.join(', ')}` : 'Нигде не используется'}>
-                      {f.usedBy?.length ? `в ${f.usedBy.length} карт.` : kb(f.size)}
-                    </span>
-                    <button
-                      type="button"
-                      className="media-item-del"
-                      onClick={() => удалить(f)}
-                      aria-label={`Удалить ${f.name}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="media-lib-note" style={{ marginTop: 10 }}>
-            Стандартные снимки из комплекта сайта остаются доступны, даже если библиотека пуста.
-          </div>
-          <div className="media-grid">
-            {['/assets/tractor-green.webp', '/assets/combine-torum.webp', '/assets/hero-field.webp'].map(
-              (p) => (
-                <div key={p} className={`media-item${value === p ? ' is-active' : ''}`}>
-                  <button
-                    type="button"
-                    className="media-item-pick"
-                    onClick={() => {
-                      onChange(p)
-                      setOpen(false)
-                    }}
-                  >
-                    <img src={p} alt="" loading="lazy" />
-                  </button>
-                  <div className="media-item-foot">
-                    <span>из комплекта</span>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        </div>
+      {open && (
+        <MediaLibraryDialog
+          selected={photos}
+          onPick={добавить}
+          onDeleted={удалена}
+          onClose={() => setOpen(false)}
+          closeOnPick={false}
+        />
       )}
     </div>
   )

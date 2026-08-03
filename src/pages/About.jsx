@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
+import { Media } from '../components/ui'
 import Reveal, { CountUp } from '../components/Reveal'
 import Production from '../components/Production'
 import usePageMeta from '../hooks/usePageMeta'
@@ -39,15 +40,12 @@ export default function About() {
                 <i className="tr" />
                 <i className="bl" />
                 <i className="br" />
-                <img
-                  src="/assets/tractor-green.webp"
-                  srcSet="/assets/tractor-green-sm.webp 760w, /assets/tractor-green.webp 1200w"
-                  sizes="(max-width: 1000px) 100vw, 560px"
+                {/* Фото редактируется в админке («Главная» → «Фото сайта»);
+                    пустое значение — снимок из комплекта сайта. */}
+                <Media
+                  src={settings.about_photo || '/assets/tractor-green.webp'}
                   alt={t('about_img_alt')}
-                  width="1200"
-                  height="655"
-                  loading="lazy"
-                  decoding="async"
+                  sizes="(max-width: 1000px) 100vw, 560px"
                 />
               </figure>
             </Reveal>

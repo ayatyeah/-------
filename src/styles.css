@@ -1245,7 +1245,7 @@ h4 {
 
 .model-thumbs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
@@ -1256,17 +1256,31 @@ h4 {
   aspect-ratio: 4 / 3;
   background: var(--green-800);
   border: 1px solid var(--rule);
-  display: grid;
-  place-items: center;
+  padding: 0;
   overflow: hidden;
+  cursor: pointer;
 }
 
-.model-thumb span {
-  font-family: var(--font-head);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--on-dark-2);
+.model-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0.72;
+  transition: opacity 0.15s ease;
+}
+
+.model-thumb:hover img {
+  opacity: 1;
+}
+
+.model-thumb.is-active {
+  border-color: var(--brass, #a8802a);
+  box-shadow: 0 0 0 1px var(--brass, #a8802a);
+}
+
+.model-thumb.is-active img {
+  opacity: 1;
 }
 
 .model-title {
@@ -3319,15 +3333,24 @@ select.input {
   opacity: 0;
 }
 
-/* Раскрытие шторкой — для крупных изображений. */
-.reveal--clip {
+/* Раскрытие шторкой — для крупных изображений.
+   clip-path — на внутренней обёртке, а не на самом наблюдаемом элементе:
+   см. комментарий в Reveal.jsx про то, почему это принципиально. */
+.reveal--clip-outer {
   opacity: 0;
+}
+
+.reveal-clip-inner {
   clip-path: inset(0 0 100% 0);
+  transition: clip-path 0.8s var(--ease);
 }
 
 .reveal.is-in {
   opacity: 1;
   transform: none;
+}
+
+.reveal--clip-outer.is-in .reveal-clip-inner {
   clip-path: inset(0 0 0 0);
 }
 
@@ -4277,6 +4300,112 @@ select.input {
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
+}
+
+/* --- набор фотографий (GalleryPicker) ------------------------------------ */
+
+.gallery-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gallery-pick-item {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  flex: none;
+  border: 1px solid var(--rule);
+  background: var(--paper-2, #f6f4f0);
+  overflow: hidden;
+}
+
+.gallery-pick-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-pick-item.is-main {
+  border-color: var(--brass, #a8802a);
+  box-shadow: 0 0 0 1px var(--brass, #a8802a);
+}
+
+.gallery-pick-tag {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  right: 4px;
+}
+
+.gallery-pick-item.is-main .gallery-pick-tag {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+  background: var(--brass, #a8802a);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gallery-pick-tag button {
+  width: 100%;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: rgba(20, 24, 20, 0.65);
+  color: #fff;
+  padding: 4px 6px;
+  font-size: 10.5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.gallery-pick-item:hover .gallery-pick-tag button,
+.gallery-pick-item:focus-within .gallery-pick-tag button {
+  opacity: 1;
+}
+
+.gallery-pick-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: rgba(20, 24, 20, 0.65);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.gallery-pick-add {
+  width: 108px;
+  height: 108px;
+  flex: none;
+  border: 1.5px dashed var(--rule-strong, #c8c2b8);
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
+  padding: 6px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.gallery-pick-add:hover {
+  border-color: var(--brass, #a8802a);
+  color: var(--brass, #a8802a);
 }
 
 /* --- библиотека ---------------------------------------------------------- */

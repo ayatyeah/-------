@@ -141,10 +141,6 @@ export default {
     cat_empty_p: 'Pick another category or browse all machinery.',
 
     back_catalog: '← Back to catalog',
-    view_1: 'View 1',
-    view_2: 'View 2',
-    view_3: 'Cab',
-    view_4: 'In action',
     photo: 'photo',
     model_subsidy: 'Included in the state support list —',
     subsidy_check: 'check on GosAgro →',

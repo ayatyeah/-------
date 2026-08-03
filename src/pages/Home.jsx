@@ -141,16 +141,16 @@ export default function Home() {
               <i className="tr" />
               <i className="bl" />
               <i className="br" />
-              {/* LCP-картинка: грузим сразу, приоритетом, без lazy */}
-              <img
-                src="/assets/hero-field.webp"
-                srcSet="/assets/hero-field-sm.webp 760w, /assets/hero-field.webp 1200w"
-                sizes="(max-width: 1000px) 100vw, 560px"
+              {/* Фото редактируется в админке («Главная» → «Фото сайта»);
+                  пустое значение — снимок из комплекта сайта. LCP-картинка:
+                  грузим сразу, приоритетом, без lazy — через Media, чтобы
+                  srcset не собирался для загруженных фото без -sm.webp
+                  (см. комментарий в Media про уже случавшийся 404). */}
+              <Media
+                src={settings.hero_photo || '/assets/hero-field.webp'}
                 alt={t('hero_img_alt')}
-                width="1200"
-                height="655"
-                fetchpriority="high"
-                decoding="sync"
+                sizes="(max-width: 1000px) 100vw, 560px"
+                priority
               />
             </figure>
           </Reveal>
