@@ -152,6 +152,29 @@ export const api = {
       return res.json()
     },
 
+    /** Загрузка файла сертификата: фото или PDF/DOC/DOCX — отдельно от общей
+        библиотеки фото, см. server/index.js POST /api/certs/upload. */
+    async uploadCertFile(blob, fileName) {
+      const res = await fetch('/api/certs/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          'Content-Type': blob.type || 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(fileName || 'document'),
+        },
+        body: blob,
+      })
+      if (res.status === 401) {
+        clearToken()
+        throw new Error('Сессия истекла — войдите заново')
+      }
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}))
+        throw new Error(msg.error || `Не удалось загрузить файл (${res.status})`)
+      }
+      return res.json()
+    },
+
     /** Скачать резервную копию содержимого сайта одним файлом. */
     async exportBackup() {
       const res = await fetch('/api/admin/export', {

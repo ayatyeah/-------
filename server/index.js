@@ -561,14 +561,48 @@ app.post('/api/certs', requireAdmin, limitAdminWrite, wrap((req, res) => {
   res.status(201).json(store.certs.create(req.body || {}))
 }))
 app.put('/api/certs/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const prev = store.certs.get(req.params.id)
+  if (!prev) return res.status(404).json({ error: 'Документ не найден' })
   const c = store.certs.update(req.params.id, req.body || {})
-  if (!c) return res.status(404).json({ error: 'Документ не найден' })
+  // Файл заменили или убрали — старый больше никому не нужен: в отличие от
+  // общей библиотеки фото, файл сертификата не переиспользуется между
+  // карточками, и без этой чистки он навсегда останется висеть в /uploads,
+  // занимая место и не показываясь ни в одном списке для удаления.
+  if (prev.file && prev.file !== c.file) {
+    uploads.removeFile(prev.file.split('/').pop())
+  }
   res.json(c)
 }))
 app.delete('/api/certs/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const prev = store.certs.get(req.params.id)
   if (!store.certs.remove(req.params.id)) return res.status(404).json({ error: 'Документ не найден' })
+  if (prev?.file) uploads.removeFile(prev.file.split('/').pop())
   res.json({ ok: true })
 }))
+
+/** Загрузка файла сертификата: фото или PDF/DOC. Отдельно от общей
+    библиотеки фото (см. server/uploads.js, saveCertFile) — файл сертификата
+    не переиспользуется между карточками и не должен путаться в общем
+    списке загрузок с фотографиями моделей. */
+app.post(
+  '/api/certs/upload',
+  requireAdmin,
+  limitUpload,
+  express.raw({ type: () => true, limit: uploads.MAX_FILE_BYTES }),
+  wrap((req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Пустой файл' })
+    }
+    let original = ''
+    try {
+      original = decodeURIComponent(req.headers['x-file-name'] || '')
+    } catch {
+      original = ''
+    }
+    const saved = uploads.saveCertFile(req.body, original)
+    res.status(201).json({ ...saved, fileName: original.slice(0, 160) })
+  })
+)
 app.post('/api/certs/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
   store.certs.reorder(req.body?.ids)
   res.json(store.certs.all())

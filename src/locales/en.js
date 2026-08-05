@@ -108,6 +108,8 @@ export default {
     certs_hint: 'Click a card to enlarge.',
     certs_doc: 'Document',
     certs_org: 'Scope',
+    certs_file_col: 'File',
+    cert_open: 'Open →',
 
     tag_leasing: 'Leasing',
     leasing_title: 'We work through KazAgroFinance',

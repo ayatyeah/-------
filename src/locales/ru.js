@@ -123,6 +123,8 @@ export default {
     certs_hint: 'Нажмите на карточку, чтобы увеличить.',
     certs_doc: 'Документ',
     certs_org: 'Область',
+    certs_file_col: 'Файл',
+    cert_open: 'Открыть →',
 
     // Лизинг и субсидии (баннеры)
     tag_leasing: 'Лизинг',

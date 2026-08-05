@@ -4770,6 +4770,70 @@ select.input {
   max-width: 190px;
 }
 
+/* --- сертификаты: название/область + приложенный файл --------------------*/
+
+.cert-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.cert-row:last-of-type {
+  border-bottom: none;
+}
+
+.cert-row-fields {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cert-row-fields .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cert-file-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  width: 210px;
+}
+
+.cert-file-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+}
+
+.cert-file-preview:hover {
+  border-color: var(--green-600);
+}
+
+.cert-file-preview img {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: var(--r-xs);
+  flex: none;
+}
+
+.cert-file-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .spec-move {
   display: flex;
   flex-direction: column;
@@ -4895,6 +4959,19 @@ select.input {
 
   .spec-row .spec-val {
     max-width: none;
+  }
+
+  .cert-row {
+    flex-wrap: wrap;
+  }
+
+  .cert-row-fields {
+    flex-basis: 100%;
+  }
+
+  .cert-file-slot {
+    width: auto;
+    flex: 1 1 auto;
   }
 
   .admin-subhead {

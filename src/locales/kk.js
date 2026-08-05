@@ -108,6 +108,8 @@ export default {
     certs_hint: 'Үлкейту үшін карточканы басыңыз.',
     certs_doc: 'Құжат',
     certs_org: 'Саласы',
+    certs_file_col: 'Файл',
+    cert_open: 'Ашу →',
 
     tag_leasing: 'Лизинг',
     leasing_title: 'ҚазАгроҚаржы арқылы жұмыс істейміз',

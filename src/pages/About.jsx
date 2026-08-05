@@ -101,6 +101,7 @@ export default function About() {
                 <tr>
                   <th>{t('certs_doc')}</th>
                   <th>{t('certs_org')}</th>
+                  <th>{t('certs_file_col')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -110,6 +111,15 @@ export default function About() {
                       {td(c.title)}
                     </td>
                     <td style={{ color: 'var(--text-2)' }}>{td(c.org)}</td>
+                    <td>
+                      {c.file ? (
+                        <a href={c.file} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                          {t('cert_open')}
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--text-3)' }}>—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

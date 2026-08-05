@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Icon from './Icon'
@@ -581,21 +581,178 @@ export function StatsPanel({ stats, reload }) {
   )
 }
 
-export function CertsPanel({ certs, reload }) {
+/** Тип по имени файла — только чтобы решить, как показать превью. */
+function certFileKind(name) {
+  const ext = (name || '').split('.').pop()?.toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image'
+  return 'doc'
+}
+
+/**
+ * Файл сертификата в строке таблицы: превью или иконка, кнопки
+ * «Загрузить/Заменить» и «Убрать». Загружает сразу, без отдельной кнопки
+ * «Сохранить» — как и остальные поля строки, сохраняется по месту.
+ */
+function CertFileSlot({ cert, onChange }) {
+  const inputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function отправить(fileList) {
+    const file = fileList?.[0]
+    if (!file) return
+    setBusy(true)
+    setError(null)
+    try {
+      const saved = await api.admin.uploadCertFile(file, file.name)
+      await onChange({ file: saved.path, fileName: file.name.slice(0, 160) })
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  const kind = cert.file ? certFileKind(cert.fileName || cert.file) : null
+
   return (
-    <TwoFieldPanel
-      items={certs}
-      reload={reload}
-      title="Сертификаты и документы"
-      hint="Список документов в разделе «О компании». Указывайте только те, что есть на руках."
-      labels={{ a: 'Название', b: 'Пояснение', aKey: 'title', bKey: 'org' }}
-      apiSet={{
-        create: api.admin.createCert,
-        update: api.admin.updateCert,
-        remove: api.admin.deleteCert,
-        reorder: api.admin.reorderCerts,
-      }}
-    />
+    <div className="cert-file-slot">
+      {cert.file && (
+        <a
+          href={cert.file}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="cert-file-preview"
+          title={cert.fileName || 'Открыть файл'}
+        >
+          {kind === 'image' ? (
+            <img src={cert.file} alt="" />
+          ) : (
+            <Icon name="doc" size={18} />
+          )}
+          <span>{cert.fileName || 'Файл'}</span>
+        </a>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx"
+        hidden
+        onChange={(e) => отправить(e.target.files)}
+      />
+      <div className="row-actions">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+        >
+          {busy ? 'Загружаем…' : cert.file ? 'Заменить' : 'Загрузить'}
+        </button>
+        {cert.file && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => onChange({ file: '', fileName: '' })}
+          >
+            Убрать
+          </button>
+        )}
+      </div>
+      {error && <div className="form-error" style={{ fontSize: 12, marginTop: 4 }}>{error}</div>}
+    </div>
+  )
+}
+
+/**
+ * Сертификаты и документы — не просто название/организация (как в
+ * TwoFieldPanel), а ещё и приложенный файл: фото сертификата или сам
+ * документ (PDF/DOC). Поэтому своя строка, не общий двухпольный редактор.
+ */
+export function CertsPanel({ certs, reload }) {
+  const { showToast } = useSite()
+  const [busy, setBusy] = useState(false)
+  const move = useReorder(certs, api.admin.reorderCerts, reload)
+
+  const изменить = async (item, patch) => {
+    try {
+      await api.admin.updateCert(item.id, patch)
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const добавить = async () => {
+    setBusy(true)
+    try {
+      await api.admin.createCert({ title: '', org: '' })
+      reload()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const удалить = async (item) => {
+    if (!confirm(`Удалить документ «${item.title}»?`)) return
+    try {
+      await api.admin.deleteCert(item.id)
+      showToast('Удалено')
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  return (
+    <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+      <h3>Сертификаты и документы</h3>
+      <p className="admin-hint" style={{ marginBottom: 12 }}>
+        Список в разделе «О компании». Можно приложить файл — фото сертификата (JPG, PNG, WebP,
+        GIF) или сам документ (PDF, DOC, DOCX): на сайте появится ссылка «Открыть».
+      </p>
+
+      {certs.map((c, i) => (
+        <div key={c.id} className="cert-row">
+          <MoveButtons index={i} total={certs.length} onMove={move} />
+          <div className="cert-row-fields">
+            <input
+              className="input"
+              defaultValue={c.title}
+              placeholder="Название документа"
+              onBlur={(e) => e.target.value !== c.title && изменить(c, { title: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={c.org}
+              placeholder="Кем выдан / область"
+              onBlur={(e) => e.target.value !== c.org && изменить(c, { org: e.target.value })}
+            />
+          </div>
+          <CertFileSlot cert={c} onChange={(patch) => изменить(c, patch)} />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => удалить(c)}
+            aria-label="Удалить"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+
+      <button type="button" className="btn btn-secondary btn-sm" onClick={добавить} disabled={busy} style={{ marginTop: 14 }}>
+        + Добавить документ
+      </button>
+
+      <small className="admin-hint" style={{ display: 'block', marginTop: 10 }}>
+        Правки в названии и области сохраняются при переходе к другому полю.
+      </small>
+    </div>
   )
 }
 

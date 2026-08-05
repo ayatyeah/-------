@@ -78,6 +78,7 @@ const MAX = {
   paragraphs: 120, // абзацев в статье
   text: 1200,
   note: 160,
+  fileName: 160, // исходное имя файла сертификата, для показа в админке
   setting: 600,
   region: 120,
   regions: 60,
@@ -340,6 +341,10 @@ function migrate(raw) {
     ...c,
     id: String(c.id ?? 'cert' + (i + 1)),
     sort: c.sort ?? i + 1,
+    // Приложенный файл сертификата (фото или PDF/DOC) появился позже —
+    // у записей, сохранённых до этой правки, поля в файле нет вовсе.
+    file: c.file || '',
+    fileName: c.fileName || '',
   }))
   d.stats = (Array.isArray(d.stats) ? d.stats : []).map((s, i) => ({
     ...s,
@@ -755,6 +760,10 @@ export const stats = {
 
 export const certs = {
   all: () => clone(data.certs).sort(bySort),
+  get: (id) => {
+    const c = data.certs.find((x) => x.id === id)
+    return c ? clone(c) : null
+  },
   create(b) {
     if (data.certs.length >= MAX.list) {
       throw Object.assign(new Error('Сертификатов уже максимум'), { status: 400 })
@@ -763,6 +772,10 @@ export const certs = {
       id: newId('ct'),
       title: str(b?.title, MAX.name) || 'Новый документ',
       org: str(b?.org, MAX.note),
+      // Файл — фото сертификата или PDF/DOC — необязателен: title/org
+      // можно ввести без него, а прикрепить позже.
+      file: safeMedia(b?.file) || '',
+      fileName: str(b?.fileName, MAX.fileName),
       sort: nextSort(data.certs),
     }
     data.certs.push(c)
@@ -774,6 +787,10 @@ export const certs = {
     if (!c) return null
     if (b.title !== undefined) c.title = str(b.title, MAX.name) || c.title
     if (b.org !== undefined) c.org = str(b.org, MAX.note)
+    // Пустая строка — осознанное «убрать файл», а не ошибка валидации:
+    // safeMedia('') вернул бы null, и c.file обнулился бы как и надо.
+    if (b.file !== undefined) c.file = safeMedia(b.file) || ''
+    if (b.fileName !== undefined) c.fileName = str(b.fileName, MAX.fileName)
     save()
     return clone(c)
   },

@@ -203,7 +203,7 @@ open('$TMP_PY/real.jpg','wb').write(bytes([0xFF,0xD8,0xFF,0xE0])+b'\x00'*100)
 open('$TMP_PY/fake.json','wb').write(b'{\"a\":1}')
 open('$TMP_PY/elf','wb').write(bytes([0x7F,0x45,0x4C,0x46])+b'\x00'*100)
 open('$TMP_PY/empty','wb').write(b'')
-open('$TMP_PY/big','wb').write(b'\xff\xd8\xff\xe0'+b'A'*(9*1024*1024))
+open('$TMP_PY/big','wb').write(b'\xff\xd8\xff\xe0'+b'A'*(16*1024*1024))
 open('$TMP_PY/svg.svg','wb').write(b'<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>')
 open('$TMP_PY/polyglot.gif','wb').write(b'GIF89a'+b'<html><script>alert(1)</script></html>')
 # Настоящий JPEG с XMP-метаданными, где встречается '<svg:width>' — ровно

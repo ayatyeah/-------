@@ -50,6 +50,17 @@ function CertLightbox({ cert, onClose }) {
             {td(cert.title)}
           </div>
           <div className="cert-org">{td(cert.org)}</div>
+          {cert.file && (
+            <a
+              href={cert.file}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: 14 }}
+            >
+              {t('cert_open')}
+            </a>
+          )}
         </div>
         <div className="lightbox-cap">
           <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{td(cert.title)}</span>

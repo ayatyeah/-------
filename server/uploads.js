@@ -54,9 +54,11 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR
 /** Адрес, по которому файлы отдаются наружу. */
 export const UPLOAD_URL_PREFIX = '/uploads'
 
-/** Потолок на один файл. Клиент ужимает снимок до загрузки, так что
-    упереться сюда можно только специально. */
-export const MAX_FILE_BYTES = 8 * 1024 * 1024
+/** Потолок на один файл. Картинку клиент ужимает до загрузки, так что
+    упереться сюда можно только специально; для сканов сертификатов (PDF,
+    DOC) сжатия нет, и многостраничный скан весит больше, чем фото —
+    поэтому потолок общий и выше, чем нужен был бы одним картинкам. */
+export const MAX_FILE_BYTES = 15 * 1024 * 1024
 
 /** Потолок на весь каталог загрузок — чтобы забитый диск не уронил сайт.
     Диск кончится → перестанет записываться store.json → перестанут
@@ -95,6 +97,39 @@ const SIGNATURES = [
 export function detectImage(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 16) return null
   return SIGNATURES.find((s) => s.test(buf)) || null
+}
+
+/**
+ * Сигнатуры документов — для сертификатов, которые не фото, а скан или
+ * PDF/DOC. Та же логика, что и с картинками: по первым байтам, не по
+ * расширению или Content-Type.
+ *
+ * DOCX проверяется по заголовку ZIP (`PK\x03\x04`) — сам формат и есть zip-
+ * архив с XML внутри. Проверка не отличает его от XLSX/PPTX/произвольного
+ * zip, но здесь это не риск: ручка только для админа, а отдаётся файл со
+ * своим Content-Type и nosniff — как бы его ни назвали, браузер не станет
+ * исполнять его как страницу.
+ */
+const DOC_SIGNATURES = [
+  { ext: 'pdf', mime: 'application/pdf', test: (b) => b.slice(0, 5).toString('ascii') === '%PDF-' },
+  {
+    ext: 'doc',
+    mime: 'application/msword',
+    test: (b) =>
+      b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0 &&
+      b[4] === 0xa1 && b[5] === 0xb1 && b[6] === 0x1a && b[7] === 0xe1,
+  },
+  {
+    ext: 'docx',
+    mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    test: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04,
+  },
+]
+
+/** Тип документа по содержимому. null — не PDF/DOC/DOCX. */
+export function detectDocument(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 16) return null
+  return DOC_SIGNATURES.find((s) => s.test(buf)) || null
 }
 
 /**
@@ -145,7 +180,7 @@ export function looksLikePolyglot(buf) {
 /** Отдача: какой Content-Type ставить файлу по его имени. */
 export function mimeByName(name) {
   const ext = name.split('.').pop()?.toLowerCase()
-  return SIGNATURES.find((s) => s.ext === ext)?.mime || 'application/octet-stream'
+  return [...SIGNATURES, ...DOC_SIGNATURES].find((s) => s.ext === ext)?.mime || 'application/octet-stream'
 }
 
 export function ensureDir() {
@@ -175,9 +210,55 @@ export function usedBytes() {
  * каталога («../../etc/passwd»), и подмена уже существующего файла, и
  * сюрпризы с юникодом в именах.
  */
-function safeName(originalName, ext) {
-  const stem = slugify(String(originalName || '').replace(/\.[^.]+$/, ''), 'img').slice(0, 40)
-  return `${stem || 'img'}-${randomUUID().slice(0, 8)}.${ext}`
+function safeName(originalName, ext, fallbackStem = 'img') {
+  const stem = slugify(String(originalName || '').replace(/\.[^.]+$/, ''), fallbackStem).slice(0, 40)
+  return `${stem || fallbackStem}-${randomUUID().slice(0, 8)}.${ext}`
+}
+
+/**
+ * Общая часть записи: проверка размера, проверка на «полиглот», квота и
+ * сама запись на диск через временный файл. Тип уже определён и проверен
+ * вызывающим (saveImage / saveCertFile) — у них разные допустимые форматы
+ * и разные сообщения об ошибке «не тот формат».
+ */
+function writeUpload(buf, originalName, kind, fallbackStem) {
+  if (buf.length > MAX_FILE_BYTES) {
+    throw Object.assign(
+      new Error(`Файл слишком большой (максимум ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} МБ)`),
+      { status: 413 }
+    )
+  }
+  const подделка = looksLikePolyglot(buf)
+  if (подделка) {
+    console.warn(
+      `Загрузка отклонена: в файле «${originalName}» найден фрагмент ` +
+      `${подделка.fragment} на смещении ${подделка.offset}`
+    )
+    throw Object.assign(
+      new Error('Файл не принят: похож на подделку под допустимый формат. Если это обычный файл — сообщите разработчику, отказ записан в лог.'),
+      { status: 415 }
+    )
+  }
+
+  ensureDir()
+
+  if (usedBytes() + buf.length > MAX_TOTAL_BYTES) {
+    throw Object.assign(
+      new Error('Место под файлы закончилось. Удалите ненужное в разделе «Фотографии».'),
+      { status: 507 }
+    )
+  }
+
+  const name = safeName(originalName, kind.ext, fallbackStem)
+  const full = join(UPLOAD_DIR, name)
+
+  // Через временный файл: оборванная загрузка не оставит в библиотеке
+  // недописанный файл, который потом молча ломает вёрстку карточки.
+  const tmp = full + '.part'
+  writeFileSync(tmp, buf)
+  renameSync(tmp, full)
+
+  return { name, path: `${UPLOAD_URL_PREFIX}/${name}`, size: buf.length, mime: kind.mime, ext: kind.ext }
 }
 
 /**
@@ -192,40 +273,23 @@ export function saveImage(buf, originalName = '') {
       { status: 415 }
     )
   }
-  if (buf.length > MAX_FILE_BYTES) {
-    throw Object.assign(new Error('Файл слишком большой (максимум 8 МБ)'), { status: 413 })
-  }
-  const подделка = looksLikePolyglot(buf)
-  if (подделка) {
-    console.warn(
-      `Загрузка отклонена: в файле «${originalName}» найден фрагмент ` +
-      `${подделка.fragment} на смещении ${подделка.offset}`
-    )
+  return writeUpload(buf, originalName, kind, 'img')
+}
+
+/**
+ * Записывает файл сертификата: фото документа или сам документ (PDF/DOC).
+ * В отличие от saveImage принимает оба вида — заказчику может быть проще
+ * сфотографировать бумажный сертификат, чем найти его скан.
+ */
+export function saveCertFile(buf, originalName = '') {
+  const kind = detectImage(buf) || detectDocument(buf)
+  if (!kind) {
     throw Object.assign(
-      new Error('Файл не принят: похож на подделку под картинку. Если это обычная фотография — сообщите разработчику, отказ записан в лог.'),
+      new Error('Файл не подходит. Подойдёт фото сертификата (JPG, PNG, WebP, GIF) или документ (PDF, DOC, DOCX).'),
       { status: 415 }
     )
   }
-
-  ensureDir()
-
-  if (usedBytes() + buf.length > MAX_TOTAL_BYTES) {
-    throw Object.assign(
-      new Error('Место под картинки закончилось. Удалите ненужные в разделе «Фотографии».'),
-      { status: 507 }
-    )
-  }
-
-  const name = safeName(originalName, kind.ext)
-  const full = join(UPLOAD_DIR, name)
-
-  // Через временный файл: оборванная загрузка не оставит в библиотеке
-  // недописанную картинку, которая потом молча ломает вёрстку карточки.
-  const tmp = full + '.part'
-  writeFileSync(tmp, buf)
-  renameSync(tmp, full)
-
-  return { name, path: `${UPLOAD_URL_PREFIX}/${name}`, size: buf.length, mime: kind.mime }
+  return writeUpload(buf, originalName, kind, 'doc')
 }
 
 /**
