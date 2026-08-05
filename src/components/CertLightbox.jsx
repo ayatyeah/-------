@@ -30,8 +30,8 @@ export default function CertLightbox({ cert, onClose }) {
 
   return (
     <div className="backdrop" onClick={onClose}>
-      <div className="lightbox" onClick={(e) => e.stopPropagation()}>
-        <div className="lightbox-sheet">
+      <div className={`lightbox${showsMedia ? ' lightbox--media' : ''}`} onClick={(e) => e.stopPropagation()}>
+        <div className={`lightbox-sheet${showsMedia ? ' lightbox-sheet--media' : ''}`}>
           {kind === 'image' && (
             <img src={cert.file} alt={td(cert.title)} className="cert-preview-media" />
           )}

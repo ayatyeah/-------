@@ -1828,10 +1828,22 @@ select.input {
   border-radius: var(--r-lg);
   width: 100%;
   max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
   background: var(--paper);
   border: 1px solid var(--rule-strong);
   box-shadow: var(--shadow-lg);
   animation: rise 0.2s var(--ease);
+}
+
+/* Приложенный файл (фото, PDF) — шире и выше декоративной карточки-печати:
+   4:3 при сертификате в формате А4 (портрет) оставлял всей картинке от
+   силы половину высоты экрана, а сам документ на ней читался мелко. Здесь
+   аспект не задаём вовсе — высота считается от видимой области экрана, а
+   не от ширины блока, и вписанный (contain) документ занимает весь
+   доступный размер, каким бы ни было соотношение сторон. */
+.lightbox--media {
+  max-width: 760px;
 }
 
 .lightbox-sheet {
@@ -1851,6 +1863,12 @@ select.input {
   );
   border-bottom: 1px solid var(--rule);
   overflow: hidden;
+}
+
+.lightbox-sheet--media {
+  aspect-ratio: auto;
+  height: min(80vh, 780px);
+  padding: 16px;
 }
 
 /* Приложенный файл сертификата открывается на месте: фото — как картинка,
