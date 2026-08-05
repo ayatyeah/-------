@@ -110,6 +110,7 @@ export default {
     certs_org: 'Саласы',
     certs_file_col: 'Файл',
     cert_open: 'Ашу →',
+    cert_download: 'Файлды жүктеу',
 
     tag_leasing: 'Лизинг',
     leasing_title: 'ҚазАгроҚаржы арқылы жұмыс істейміз',

@@ -11,6 +11,7 @@ import Steps from '../components/Steps'
 import Icon from '../components/Icon'
 import WhatWeDo from '../components/WhatWeDo'
 import Production from '../components/Production'
+import CertLightbox from '../components/CertLightbox'
 import { api } from '../api'
 import { useFetch } from '../store'
 import usePageMeta from '../hooks/usePageMeta'
@@ -33,43 +34,6 @@ function HeroTitle({ text }) {
       <br />
       <em>{text.slice(i + 1).trim()}</em>
     </>
-  )
-}
-
-/** Лайтбокс сертификата. */
-function CertLightbox({ cert, onClose }) {
-  const { t, td } = useT()
-  return (
-    <div className="backdrop" onClick={onClose}>
-      <div className="lightbox" onClick={(e) => e.stopPropagation()}>
-        <div className="lightbox-sheet">
-          <div className="cert-seal" style={{ width: 54, height: 54, fontSize: 16 }}>
-            СХМ
-          </div>
-          <div className="cert-title" style={{ fontSize: 24 }}>
-            {td(cert.title)}
-          </div>
-          <div className="cert-org">{td(cert.org)}</div>
-          {cert.file && (
-            <a
-              href={cert.file}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-sm"
-              style={{ marginTop: 14 }}
-            >
-              {t('cert_open')}
-            </a>
-          )}
-        </div>
-        <div className="lightbox-cap">
-          <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{td(cert.title)}</span>
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            {t('close_x')}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 

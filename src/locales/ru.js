@@ -125,6 +125,7 @@ export default {
     certs_org: 'Область',
     certs_file_col: 'Файл',
     cert_open: 'Открыть →',
+    cert_download: 'Скачать файл',
 
     // Лизинг и субсидии (баннеры)
     tag_leasing: 'Лизинг',

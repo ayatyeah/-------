@@ -72,10 +72,15 @@ const CSP = [
   "base-uri 'self'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  // Добавлено вместе с загрузкой картинок: даже если в каталог загрузок
-  // однажды попадёт html-подобный файл, он не сможет ни открыться рамкой,
-  // ни запустить воркер, ни утащить страницу в другой контекст.
-  "frame-src 'none'",
+  // 'self', а не 'none': PDF сертификата открывается во встроенном
+  // просмотрщике браузера через iframe (см. CertLightbox), а не уводит
+  // на отдельную вкладку. Чужие сайты сюда не пускаем — только свой домен.
+  // Опасность, ради которой раньше стояло 'none' (html-подобный файл,
+  // затесавшийся в /uploads), закрыта не этим запретом, а тем, что при
+  // отдаче стоит свой Content-Type по сигнатуре + nosniff (см.
+  // server/uploads.js) — framed-файл рендерится как заявленный тип, а не
+  // исполняется как страница, даже если внутри что-то не то.
+  "frame-src 'self'",
   "worker-src 'self'",
   "media-src 'self'",
   "manifest-src 'self'",
@@ -921,6 +926,17 @@ app.get('/uploads/:name', (req, res) => {
   res.setHeader('Content-Type', uploads.mimeByName(req.params.name))
   res.setHeader('Content-Disposition', 'inline')
   res.setHeader('X-Content-Type-Options', 'nosniff')
+  /* Общие для всего сайта X-Frame-Options: DENY и CSP frame-ancestors 'none'
+     (см. middleware выше) запрещали бы и своей же странице показать PDF
+     сертификата во встроенном просмотрщике (CertLightbox, iframe) — оба
+     заголовка говорят «меня нельзя показывать во фрейме вообще ни от кого»,
+     и это относится к ЭТОМУ ответу (отдаче файла), не к странице, которая
+     его встраивает. SAMEORIGIN и frame-ancestors 'self' смягчают это ровно
+     до «можно показывать в фрейме, но только со своего домена» — то, что
+     разрешает frame-src 'self' в общей политике, здесь просто нужно
+     подтвердить и со стороны отдаваемого файла. */
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('Content-Security-Policy', CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'"))
   // Имя файла уникально и не переиспользуется, поэтому кешируем надолго.
   res.setHeader('Cache-Control', 'public, max-age=2592000, immutable')
   res.sendFile(full)

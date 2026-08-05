@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media } from '../components/ui'
 import Reveal, { CountUp } from '../components/Reveal'
 import Production from '../components/Production'
+import CertLightbox from '../components/CertLightbox'
 import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
 
@@ -19,6 +21,9 @@ export default function About() {
   const tiltRef = useTilt(8)
   const stats = home?.stats ?? []
   const certs = home?.certs ?? []
+  // Открывается тот же лайтбокс, что и на главной: файл показывается на
+  // месте (фото, PDF) или скачивается (DOC/DOCX), а не уводит на вкладку.
+  const [openCert, setOpenCert] = useState(null)
 
   return (
     <main className="route-fade">
@@ -113,9 +118,9 @@ export default function About() {
                     <td style={{ color: 'var(--text-2)' }}>{td(c.org)}</td>
                     <td>
                       {c.file ? (
-                        <a href={c.file} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpenCert(c)}>
                           {t('cert_open')}
-                        </a>
+                        </button>
                       ) : (
                         <span style={{ color: 'var(--text-3)' }}>—</span>
                       )}
@@ -155,6 +160,8 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {openCert && <CertLightbox cert={openCert} onClose={() => setOpenCert(null)} />}
     </main>
   )
 }

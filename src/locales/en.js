@@ -110,6 +110,7 @@ export default {
     certs_org: 'Scope',
     certs_file_col: 'File',
     cert_open: 'Open →',
+    cert_download: 'Download file',
 
     tag_leasing: 'Leasing',
     leasing_title: 'We work through KazAgroFinance',
