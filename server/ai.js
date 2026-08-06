@@ -842,3 +842,117 @@ export async function chat(message, history = [], { rulesOnly = false, lang = 'r
   if (key) store.aiCache.set(key, res.text, CHAT_TTL)
   return { reply: res.text, engine: res.engine }
 }
+
+/* ======================================================================
+   3. AI-ИМПОРТ КАТАЛОГА ИЗ ДОКУМЕНТОВ
+   ====================================================================== */
+
+const IMPORT_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Название модели техники' },
+          catId: {
+            type: 'string',
+            description: 'id категории из присланного списка, ближайшая по смыслу; пустая строка, если ни одна не подходит',
+          },
+          short: { type: 'string', description: 'Одно-два предложения о модели' },
+          specs: {
+            type: 'array',
+            description: 'Найденные характеристики: ключ — по возможности из шаблона категории, значение — с единицами измерения как в тексте',
+            items: {
+              type: 'object',
+              properties: {
+                k: { type: 'string' },
+                v: { type: 'string' },
+              },
+              required: ['k', 'v'],
+            },
+          },
+          subsidized: { type: 'boolean', description: 'true только если в тексте явно упомянута субсидия/господдержка' },
+          confidence: { type: 'integer', description: 'Уверенность 0-100: ниже, если категория или характеристики — скорее догадка' },
+          note: { type: 'string', description: 'Коротко, что именно неточно или откуда взято название; пусто, если всё ясно' },
+        },
+        required: ['name', 'catId', 'short', 'specs', 'subsidized', 'confidence', 'note'],
+      },
+    },
+    overview: { type: 'string', description: 'Два-три предложения: что за документ и что удалось найти' },
+  },
+  required: ['items', 'overview'],
+}
+
+const IMPORT_SYSTEM = `Ты помогаешь наполнить каталог сайта ТОО «СХМ Агро» (производство и продажа сельхозтехники в Казахстане) из присланного документа — обычно это прайс-лист или техническая спецификация от завода.
+
+Тебе дают: список категорий каталога (id, название, шаблон характеристик) и сырой текст, извлечённый из файла (таблица могла превратиться в текст со табуляцией — это нормально).
+
+Задача: найди в тексте КАЖДУЮ отдельную модель техники и опиши её по схеме.
+- catId бери из присланного списка категорий, максимально близко по смыслу (трактор → категория тракторов и т.д.). Если техника явно не сельскохозяйственная или категория непонятна — оставь catId пустым.
+- specs заполняй тем, что реально нашлось в тексте: ключи бери из шаблона характеристик категории, когда значение им соответствует, но не выдумывай значения, которых в тексте нет. Характеристики вне шаблона тоже включай — лучше больше данных, чем меньше.
+- confidence — честная самооценка: 80-100, если модель и цифры прямо читаются из текста; 40-79, если часть данных пришлось додумывать по контексту; ниже 40, если запись почти наверняка ошибочная или неполная.
+- note — только если confidence не максимальный: одна короткая фраза, что именно под вопросом.
+- Не пропускай модели с неполными данными — верни их с низким confidence, решать, включать ли, будет человек.
+- Если в тексте вообще нет техники (например, это счёт-фактура или письмо не по теме) — верни пустой items и объясни это в overview.
+
+Пиши по-русски, без рекламных штампов.`
+
+/**
+ * Раскладывает сырой текст документа на черновики моделей каталога.
+ * Не кэшируется и не имеет запасного пути без ИИ — в отличие от анализа
+ * лидов, здесь нет осмысленного алгоритма «по правилам» для произвольного
+ * прайс-листа, поэтому при недоступном ИИ честно возвращаем пустой список.
+ */
+export async function importCatalog(text) {
+  if (!aiEnabled()) {
+    return {
+      items: [],
+      overview: 'ИИ сейчас недоступен — импорт из документов требует подключённого ИИ-провайдера.',
+      engine: 'rules',
+    }
+  }
+
+  const categories = store.categories.all()
+  const catList = categories
+    .map((c) => `- ${c.id}: ${c.name} (шаблон: ${(c.specTemplate || []).join(', ') || '—'})`)
+    .join('\n')
+
+  const res = await ask({
+    label: `импорт каталога (${text.length} симв. текста)`,
+    system: IMPORT_SYSTEM,
+    schema: IMPORT_SCHEMA,
+    maxTokens: 12000,
+    think: true,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Категории каталога:\n${catList}\n\n` +
+          `Текст документа:\n${text}\n\n` +
+          'Верни JSON по схеме: items — по одной записи на каждую найденную модель техники, overview — краткий общий вывод.',
+      },
+    ],
+  })
+
+  const parsed = res && parseJson(res.text)
+  if (!parsed?.items) {
+    return { items: [], overview: 'ИИ не смог разобрать документ. Попробуйте другой файл или формат.', engine: res?.engine || 'ошибка' }
+  }
+
+  const catIds = new Set(categories.map((c) => c.id))
+  const items = parsed.items.map((it) => ({
+    name: String(it.name || '').slice(0, 200),
+    catId: catIds.has(it.catId) ? it.catId : '',
+    short: String(it.short || '').slice(0, 400),
+    specs: Array.isArray(it.specs)
+      ? it.specs.slice(0, 60).map((s) => ({ k: String(s.k || '').slice(0, 120), v: String(s.v || '').slice(0, 240) }))
+      : [],
+    subsidized: !!it.subsidized,
+    confidence: Math.max(0, Math.min(100, Math.round(it.confidence ?? 0))),
+    note: String(it.note || '').slice(0, 300),
+  }))
+
+  return { items, overview: String(parsed.overview || ''), engine: res.engine }
+}

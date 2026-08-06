@@ -75,6 +75,30 @@ export const api = {
     deleteModel: (id) => request(`/models/${id}`, { method: 'DELETE', auth: true }),
     reorderModels: (ids) => request('/models/reorder', { method: 'POST', body: { ids }, auth: true }),
 
+    /** AI-импорт каталога: файл сырым телом, как uploadCertFile. */
+    async catalogImportAnalyze(blob, fileName) {
+      const res = await fetch('/api/admin/catalog-import/analyze', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          'Content-Type': blob.type || 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(fileName || 'file'),
+        },
+        body: blob,
+      })
+      if (res.status === 401) {
+        clearToken()
+        throw new Error('Сессия истекла — войдите заново')
+      }
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}))
+        throw new Error(msg.error || `Не удалось разобрать файл (${res.status})`)
+      }
+      return res.json()
+    },
+    catalogImportCommit: (items) =>
+      request('/admin/catalog-import/commit', { method: 'POST', body: { items }, auth: true }),
+
     news: () => request('/news?all=1', { auth: true }),
     createNews: (body) => request('/news', { method: 'POST', body, auth: true }),
     updateNews: (id, body) => request(`/news/${id}`, { method: 'PUT', body, auth: true }),

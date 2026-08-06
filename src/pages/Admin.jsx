@@ -4,6 +4,7 @@ import { api, clearToken, formatDateShort, getToken, setToken } from '../api'
 import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
+import CatalogImportPanel from '../components/AdminCatalogImport'
 import {
   CategoriesPanel,
   ServicesPanel,
@@ -415,6 +416,7 @@ function SummaryTab({ summary, requests, onGoTab, onMonthChange }) {
 function CatalogTab({ models, cats, reload }) {
   const { showToast } = useSite()
   const [editing, setEditing] = useState(null) // { model } | { model: null } для новой
+  const [importing, setImporting] = useState(false)
 
   /* Перестановка моделей. Раньше порядок задавался при создании и больше
      не менялся: новая модель всегда падала в конец каталога, а поднять её
@@ -461,9 +463,14 @@ function CatalogTab({ models, cats, reload }) {
           <h1>Каталог техники</h1>
           <p className="admin-hint">Модели, категории и признак субсидии.</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setEditing({ model: null })}>
-          + Добавить модель
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImporting(true)}>
+            AI-импорт из файла
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => setEditing({ model: null })}>
+            + Добавить модель
+          </button>
+        </div>
       </div>
 
       {models.length === 0 ? (
@@ -559,6 +566,14 @@ function CatalogTab({ models, cats, reload }) {
           cats={cats}
           onSave={save}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {importing && (
+        <CatalogImportPanel
+          cats={cats}
+          onClose={() => setImporting(false)}
+          onImported={reload}
         />
       )}
     </>

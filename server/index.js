@@ -25,6 +25,7 @@ import * as uploads from './uploads.js'
 import { notifyNewRequest, notifyText } from './notify.js'
 import { PRIVACY_VERSION } from '../shared/constants.js'
 import ExcelJS from 'exceljs'
+import { extractText, detectExt } from './catalog-import.js'
 
 const { seeded, recovered } = store.load()
 
@@ -719,6 +720,78 @@ app.delete('/api/models/:id', requireAdmin, limitAdminWrite, wrap((req, res) => 
 app.post('/api/models/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
   store.models.reorder(req.body?.ids)
   res.json(store.models.all({ includeUnpublished: true }))
+}))
+
+/* ------------------- AI-импорт каталога из документов (задача 7) -------- */
+
+/* Прайс-лист/спецификация (XLSX/DOCX/PDF) → текст на сервере → ИИ раскладывает
+   его на черновики моделей. Файл уходит сырым телом запроса, тем же
+   способом, что и остальные загрузки (см. /api/certs/upload) — без
+   FormData и парсера форм на сервере. */
+app.post(
+  '/api/admin/catalog-import/analyze',
+  requireAdmin,
+  limitAnalyze,
+  express.raw({ type: () => true, limit: uploads.MAX_FILE_BYTES }),
+  wrap(async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Пустой файл' })
+    }
+    let fileName = ''
+    try {
+      fileName = decodeURIComponent(req.headers['x-file-name'] || '')
+    } catch {
+      fileName = ''
+    }
+    const ext = detectExt(fileName, req.headers['content-type'])
+    if (!ext) {
+      return res.status(415).json({ error: 'Поддерживаются только файлы XLSX, DOCX и PDF' })
+    }
+
+    if (aiBudgetLeft() <= 0) {
+      return res.status(429).json({
+        error: 'Суточный лимит обращений к ИИ исчерпан. Импорт вернётся завтра.',
+      })
+    }
+
+    const { text, truncated } = await extractText(req.body, ext)
+    aiBudgetTake()
+    const result = await ai.importCatalog(text)
+    if (truncated) {
+      result.overview =
+        (result.overview ? result.overview + ' ' : '') +
+        'Документ длинный, разобрана только первая часть — для остального понадобится отдельный файл.'
+    }
+    res.json(result)
+  })
+)
+
+/* Создание моделей-черновиков после проверки человеком в админке — items
+   уже отредактированы на экране проверки, здесь только массовое создание
+   тем же путём, что и обычная форма модели (те же лимиты и проверки). */
+app.post('/api/admin/catalog-import/commit', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 100) : []
+  if (!items.length) return res.status(400).json({ error: 'Нечего создавать' })
+
+  const created = []
+  const failed = []
+  for (const it of items) {
+    try {
+      const m = store.models.create({
+        name: it.name,
+        cat: it.cat,
+        short: it.short,
+        descr: it.descr,
+        specs: it.specs,
+        subsidized: !!it.subsidized,
+        published: false,
+      })
+      created.push(m)
+    } catch (e) {
+      failed.push({ name: it.name || '(без названия)', error: e.message })
+    }
+  }
+  res.json({ created, failed })
 }))
 
 /* -------------------------------- новости ------------------------------ */
