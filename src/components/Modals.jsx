@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useSite } from '../store'
 import { ConsentCheck, Dialog, Honeypot } from './ui'
 import { useT } from '../i18n'
+import { getAttribution } from '../lib/attribution'
 
 /** Заявка на КП: имя, телефон, регион, комментарий. */
 function KPDialog() {
@@ -32,6 +33,7 @@ function KPDialog() {
         modelId: modal.modelId,
         website: f.k_website.value, // honeypot — у людей пуст
         consent: true,
+        ...getAttribution(),
       })
       closeModal()
       showToast(t('kp_toast'))
@@ -119,6 +121,7 @@ function CallDialog() {
         phone: f.cb_phone.value.trim(),
         website: f.cb_website.value,
         consent: true,
+        ...getAttribution(),
       })
       closeModal()
       showToast(t('call_toast'))

@@ -6,6 +6,7 @@ import { ConsentCheck, Honeypot } from '../components/ui'
 import Icon from '../components/Icon'
 import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
+import { getAttribution } from '../lib/attribution'
 
 const SOCIAL = [
   { key: 'instagram_url', name: 'Instagram' },
@@ -115,6 +116,7 @@ export default function Contacts() {
         meta: 'Обратная связь',
         website: f.c_website.value,
         consent: true,
+        ...getAttribution(),
       })
       f.reset()
       setConsent(false) // форма очищена — согласие тоже сбрасываем

@@ -229,6 +229,15 @@ function SummaryTab({ summary, requests, onGoTab, onMonthChange }) {
 
   const latest = requests.slice(0, 5)
 
+  // Горячие лиды по сохранённой оценке ИИ — необработанные заявки с
+  // приоритетом «Горячий», начиная с самой перспективной. Оценки берутся из
+  // заявок напрямую (см. server/ai.js setAiVerdicts), поэтому список виден
+  // сразу при заходе в «Сводку», без похода во вкладку «Заявки».
+  const hotLeads = requests
+    .filter((r) => r.aiPriority === 'Горячий' && r.status !== 'Обработана')
+    .sort((a, b) => (b.aiScore ?? 0) - (a.aiScore ?? 0))
+    .slice(0, 5)
+
   return (
     <>
       <div className="admin-head">
@@ -254,6 +263,44 @@ function SummaryTab({ summary, requests, onGoTab, onMonthChange }) {
       </div>
 
       <DashboardSection summary={summary} onMonthChange={onMonthChange} />
+
+      {hotLeads.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 19, marginBottom: 14, marginTop: 8 }}>🔥 Горячие лиды</h3>
+          <div className="admin-panel" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+            {hotLeads.map((r) => (
+              <button
+                type="button"
+                key={r.id}
+                onClick={() => onGoTab('requests')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  textAlign: 'left',
+                  background: 'transparent',
+                  border: '1px solid var(--rule)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span className="tag tag-brass" style={{ flexShrink: 0 }}>{r.aiScore}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <b>{r.fio}</b>
+                  {r.meta && r.meta !== '—' && (
+                    <span style={{ color: 'var(--text-3)' }}> · {r.meta}</span>
+                  )}
+                  {r.aiAction && (
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>{r.aiAction}</div>
+                  )}
+                </span>
+                <span style={{ color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{r.phone}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3 style={{ fontSize: 19, marginBottom: 14, marginTop: 8 }}>Последние заявки</h3>
       {latest.length === 0 ? (
@@ -687,12 +734,44 @@ const prioClass = (p) => (p === 'Горячий' ? 'hot' : p === 'Тёплый' 
 const prioTag = (p) =>
   p === 'Горячий' ? 'tag-brass' : p === 'Тёплый' ? 'tag-green' : 'tag-muted'
 
+/** Короткая подпись источника заявки: utm-метка, домен перехода или ничего
+    (прямой заход без меток — самый частый случай, писать его незачем). */
+function sourceLabel(r) {
+  if (r.utmSource) return [r.utmSource, r.utmMedium].filter(Boolean).join(' / ')
+  if (r.referrer) {
+    try {
+      return new URL(r.referrer).hostname.replace(/^www\./, '')
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+
 /* ---------------------------- вкладка: заявки ---------------------------- */
+
+/** Вердикты ИИ, уже сохранённые на заявках (см. server/ai.js
+    analyzeLeads → store.requests.setAiVerdicts) — таблица подсвечивает и
+    умеет сортировать по ним сразу при открытии, не дожидаясь повторного
+    клика «Анализировать» после перезагрузки страницы. */
+const scoresFromRequests = (requests) =>
+  Object.fromEntries(
+    requests
+      .filter((r) => r.aiScore != null)
+      .map((r) => [r.id, { priority: r.aiPriority, score: r.aiScore, summary: r.aiSummary, action: r.aiAction }])
+  )
 
 function RequestsTab({ requests, reload }) {
   const { showToast } = useSite()
-  // Оценки ИИ по id заявки — подсвечивают строки таблицы.
-  const [scored, setScored] = useState({})
+  // Оценки ИИ по id заявки — подсвечивают строки таблицы. При открытии
+  // вкладки подхватываем то, что уже сохранено на заявках, а не начинаем
+  // с пустого места.
+  const [scored, setScored] = useState(() => scoresFromRequests(requests))
+  const [sortByScore, setSortByScore] = useState(false)
+
+  const rows = sortByScore
+    ? [...requests].sort((a, b) => (scored[b.id]?.score ?? -1) - (scored[a.id]?.score ?? -1))
+    : requests
 
   const setStatus = async (r, status) => {
     try {
@@ -723,6 +802,16 @@ function RequestsTab({ requests, reload }) {
             Входящие запросы на КП и заказы звонка. Меняйте статус по мере обработки.
           </p>
         </div>
+        {requests.some((r) => r.aiScore != null) && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-2)' }}>
+            <input
+              type="checkbox"
+              checked={sortByScore}
+              onChange={(e) => setSortByScore(e.target.checked)}
+            />
+            Сортировать по баллу ИИ
+          </label>
+        )}
       </div>
 
       {requests.length > 0 && (
@@ -738,6 +827,7 @@ function RequestsTab({ requests, reload }) {
               <tr>
                 <th>Дата</th>
                 <th>Тип</th>
+                <th>Балл ИИ</th>
                 <th>Имя</th>
                 <th>Телефон</th>
                 <th>Модель / регион</th>
@@ -746,13 +836,22 @@ function RequestsTab({ requests, reload }) {
               </tr>
             </thead>
             <tbody>
-              {requests.map((r) => (
+              {rows.map((r) => (
                 <tr key={r.id} className={scored[r.id] ? `row-${prioClass(scored[r.id].priority)}` : ''}>
                   <td data-label="Дата" style={{ whiteSpace: 'nowrap' }}>{formatDateShort(r.date)}</td>
                   <td data-label="Тип">
                     <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>
                       {r.type}
                     </span>
+                  </td>
+                  <td data-label="Балл ИИ">
+                    {scored[r.id] ? (
+                      <span className={`tag ${prioTag(scored[r.id].priority)}`} title={scored[r.id].summary}>
+                        {scored[r.id].score}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="card-title" style={{ fontWeight: 500 }}>
                     {r.fio}
@@ -778,6 +877,11 @@ function RequestsTab({ requests, reload }) {
                     {r.comment && (
                       <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 4 }}>
                         «{r.comment}»
+                      </div>
+                    )}
+                    {sourceLabel(r) && (
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+                        источник: {sourceLabel(r)}
                       </div>
                     )}
                   </td>

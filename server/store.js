@@ -927,7 +927,20 @@ export const requests = {
     const r = data.requests.find((x) => x.id === id)
     return r ? clone(r) : null
   },
-  create({ type, fio, phone, meta, comment, consentAt, policyVersion }) {
+  create({
+    type,
+    fio,
+    phone,
+    meta,
+    comment,
+    consentAt,
+    policyVersion,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    referrer,
+    page,
+  }) {
     const r = {
       id: newId('r'),
       date: today(),
@@ -948,6 +961,13 @@ export const requests = {
          ответ должен быть предметным, а не «где-то стояла галочка». */
       consentAt: consentAt || new Date().toISOString(),
       policyVersion: policyVersion || '',
+      // Атрибуция источника (задача 3 дорожной карты) — откуда пришёл
+      // клиент. Может быть пустой у старых заявок и у заявок без меток.
+      utmSource: utmSource || '',
+      utmMedium: utmMedium || '',
+      utmCampaign: utmCampaign || '',
+      referrer: referrer || '',
+      page: page || '',
     }
     data.requests.unshift(r)
     // Заявку — сразу на диск, не через отложенный save(): показать клиенту
@@ -977,6 +997,25 @@ export const requests = {
     r.resolvedAt = status === 'Обработана' ? new Date().toISOString() : null
     save()
     return clone(r)
+  },
+  /** Записывает вердикты ИИ-анализатора лидов (см. server/ai.js
+      analyzeLeads) прямо в заявки — оценка переживает перезагрузку страницы
+      и рестарт сервера, а не живёт только в памяти вкладки браузера. */
+  setAiVerdicts(verdicts) {
+    if (!verdicts?.length) return
+    const at = new Date().toISOString()
+    let changed = false
+    for (const v of verdicts) {
+      const r = data.requests.find((x) => x.id === v.id)
+      if (!r) continue
+      r.aiScore = v.score
+      r.aiPriority = v.priority
+      r.aiSummary = v.summary
+      r.aiAction = v.action
+      r.aiScoredAt = at
+      changed = true
+    }
+    if (changed) save()
   },
   remove(id) {
     const i = data.requests.findIndex((x) => x.id === id)

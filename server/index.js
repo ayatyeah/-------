@@ -772,6 +772,14 @@ app.post('/api/requests', limitRequests, wrap(async (req, res) => {
   const fio = clean(req.body?.fio, 100)
   const phone = clean(req.body?.phone, 40)
   const comment = clean(req.body?.comment, 1000)
+  // Атрибуция источника — откуда пришла заявка (см. src/lib/attribution.js).
+  // Ни одно из полей не обязательно: заявка без меток — просто заявка без
+  // известного источника, а не повод её отклонить.
+  const utmSource = clean(req.body?.utmSource, 150)
+  const utmMedium = clean(req.body?.utmMedium, 150)
+  const utmCampaign = clean(req.body?.utmCampaign, 150)
+  const referrer = clean(req.body?.referrer, 300)
+  const page = clean(req.body?.page, 150)
 
   /* Ловушка для ботов. Поле `website` спрятано от людей (см. формы), человек
      его не заполняет, а бот заполняет все поля подряд. Отвечаем ложным
@@ -816,6 +824,11 @@ app.post('/api/requests', limitRequests, wrap(async (req, res) => {
     comment,
     consentAt: new Date().toISOString(),
     policyVersion: PRIVACY_VERSION,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    referrer,
+    page,
   })
 
   // Отвечаем форме сразу — уведомление в Telegram не должно её задерживать и

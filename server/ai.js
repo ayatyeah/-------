@@ -415,7 +415,11 @@ export async function analyzeLeads() {
   if (!all.length) {
     return { leads: [], overview: 'Заявок пока нет.', engine: aiEngine() }
   }
-  if (!aiEnabled()) return fallbackAnalyze(all, modelsById)
+  if (!aiEnabled()) {
+    const r = fallbackAnalyze(all, modelsById)
+    store.requests.setAiVerdicts(r.leads)
+    return r
+  }
 
   // Сначала те, с которыми ещё работать: обработанные менеджеру не нужны.
   const actionable = all.filter((r) => r.status !== 'Обработана')
@@ -440,8 +444,10 @@ export async function analyzeLeads() {
   // Ничего нового — ИИ не зовём вовсе, ни одного токена.
   if (!новые.length) {
     const обзор = store.aiCache.get('lead-overview:' + отпечатокПачки(queue))
+    const leads = готовые.sort((a, b) => b.score - a.score)
+    store.requests.setAiVerdicts(leads)
     return {
-      leads: готовые.sort((a, b) => b.score - a.score),
+      leads,
       overview: хвост(обзор || сводкаПоОценкам(готовые)),
       engine: 'кэш',
       fromCache: готовые.length,
@@ -512,6 +518,7 @@ export async function analyzeLeads() {
   if (!parsed?.leads?.length) {
     const r = fallbackAnalyze(all, modelsById)
     r.overview = 'ИИ сейчас недоступен, оценка по правилам. ' + r.overview
+    store.requests.setAiVerdicts(r.leads)
     return r
   }
 
@@ -541,6 +548,7 @@ export async function analyzeLeads() {
   const leads = [...готовые, ...свежие, ...пропущенные].sort((a, b) => b.score - a.score)
   const overview = parsed.overview ?? сводкаПоОценкам(leads)
   store.aiCache.set('lead-overview:' + отпечатокПачки(queue), overview, LEAD_TTL)
+  store.requests.setAiVerdicts(leads)
 
   return {
     leads,

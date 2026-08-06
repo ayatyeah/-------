@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { SiteProvider, useSite } from './store'
 import { api } from './api'
+import { captureAttribution } from './lib/attribution'
 import { useHiddenOnScrollDown } from './hooks/useMotion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -74,6 +75,12 @@ function Shell() {
     sessionStorage.setItem('shm_visited', '1')
     if (!isAdmin) api.visit().catch(() => {})
   }, [isAdmin])
+
+  // Метки перехода (utm/referrer) — читаем адресную строку один раз на
+  // вкладку, до того как посетитель, возможно, уйдёт на страницу без них.
+  useEffect(() => {
+    captureAttribution()
+  }, [])
 
   return (
     <div className="app">
