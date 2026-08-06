@@ -13,7 +13,6 @@ import {
   RegionsPanel,
   PasswordPanel,
   BackupPanel,
-  DatabasePanel,
 } from '../components/AdminPanels'
 import Icon from '../components/Icon'
 import { LineChart, StackedBarChart, Donut } from '../components/Charts'
@@ -992,7 +991,9 @@ function SettingsTab({ onRelogin }) {
         <RegionsPanel />
         <PasswordPanel onRelogin={onRelogin} />
         <BackupPanel />
-        <DatabasePanel />
+        {/* DatabasePanel временно убрана из интерфейса (см. AdminPanels.jsx) —
+            сама база и синхронизация продолжают работать в фоне как обычно,
+            просто не показываются в админке. */}
       </div>
     </>
   )
