@@ -206,6 +206,14 @@ const limitVisit = rateLimit({
   message: 'Слишком часто.',
 })
 
+/* Те же счётчики, что и визиты (задача 2), но событий за визит бывает
+   несколько (открыл пару карточек моделей, начал форму) — потолок выше. */
+const limitMetrics = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: 'Слишком часто.',
+})
+
 /* Общий потолок на всё API.
    Дыра, которая закрывается: точечные лимиты стояли только на входе,
    заявках и ИИ. Открытые GET (/api/models, /api/home, /api/sitemap) были
@@ -760,6 +768,25 @@ app.get('/api/requests', requireAdmin, wrap((_req, res) => res.json(store.reques
    адресов, идентификаторов или cookie не пишем, только +1 к счётчику дня. */
 app.post('/api/visit', limitVisit, wrap((_req, res) => {
   store.visits.bump()
+  res.status(204).end()
+}))
+
+/* Те же приватные счётчики без cookie, что и визит — три дополнительных
+   события (задача 2): просмотр карточки модели, начало заполнения формы,
+   открытие AI-чата. Никакого содержимого события не пишем, кроме id
+   модели — он и так публичный (виден в адресе страницы). */
+app.post('/api/metrics', limitMetrics, wrap((req, res) => {
+  const type = req.body?.type
+  if (type === 'model_view') {
+    const modelId = clean(req.body?.modelId, 40)
+    if (modelId) store.metrics.bumpModelView(modelId)
+  } else if (type === 'form_start') {
+    store.metrics.bumpFormStart()
+  } else if (type === 'ai_chat_open') {
+    store.metrics.bumpAiChatOpen()
+  } else {
+    return res.status(400).json({ error: 'Неизвестный тип события' })
+  }
   res.status(204).end()
 }))
 

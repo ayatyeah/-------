@@ -231,6 +231,11 @@ function freshData() {
        а хранить что-то более подробное означало бы собирать персональные
        данные без нужды. */
     visits: {},
+    /* Те же приватные счётчики без cookie и идентификаторов, что и visits,
+       только по трём дополнительным событиям (задача 2 дорожной карты):
+       просмотр карточки модели, начало заполнения формы, открытие AI-чата.
+       modelViews — с разбивкой по модели, остальные два — просто по дням. */
+    metrics: { modelViews: {}, formStarts: {}, aiChatOpens: {} },
   }
 }
 
@@ -1180,6 +1185,48 @@ export const visits = {
   all: () => clone(data.visits),
 }
 
+/** Держит не больше ~15 месяцев истории у объекта по дням — тот же потолок
+    и смысл, что у visits.bump(): старше сводке уже не нужно. */
+function capHistory(byDay, maxDays = 450) {
+  const days = Object.keys(byDay)
+  if (days.length > maxDays) {
+    days.sort()
+    for (const key of days.slice(0, days.length - maxDays)) delete byDay[key]
+  }
+}
+
+/* --------------------------- счётчики без cookie (задача 2) -------------- */
+
+export const metrics = {
+  /** Просмотр карточки модели — плюс один к счётчику дня для этой модели.
+      Дедуп «один раз за вкладку на модель» — на стороне сайта (см.
+      ModelPage.jsx), здесь просто считаем, что прислали. */
+  bumpModelView(modelId) {
+    if (!modelId) return
+    const d = today()
+    data.metrics.modelViews[d] = data.metrics.modelViews[d] || {}
+    data.metrics.modelViews[d][modelId] = (data.metrics.modelViews[d][modelId] || 0) + 1
+    capHistory(data.metrics.modelViews)
+    save()
+  },
+  /** Начало заполнения формы (открыли диалог КП/звонка или начали печатать
+      на «Контактах») — сигнал интереса отдельно от того, дошли ли до
+      отправки. */
+  bumpFormStart() {
+    const d = today()
+    data.metrics.formStarts[d] = (data.metrics.formStarts[d] || 0) + 1
+    capHistory(data.metrics.formStarts)
+    save()
+  },
+  /** Открытие панели AI-чата. */
+  bumpAiChatOpen() {
+    const d = today()
+    data.metrics.aiChatOpens[d] = (data.metrics.aiChatOpens[d] || 0) + 1
+    capHistory(data.metrics.aiChatOpens)
+    save()
+  },
+}
+
 /* -------------------------------- сводка ----------------------------------- */
 
 const STATUS_LIST = ['Новая', 'В работе', 'Обработана']
@@ -1274,6 +1321,24 @@ export const dashboard = {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
 
+    // Свои счётчики без cookie (задача 2) — просмотры карточек моделей за
+    // месяц (top-8), начатые формы и открытия AI-чата суммой за месяц.
+    const modelViewCounts = new Map()
+    for (const d of days) {
+      const byModelDay = data.metrics.modelViews[d]
+      if (!byModelDay) continue
+      for (const [id, count] of Object.entries(byModelDay)) {
+        modelViewCounts.set(id, (modelViewCounts.get(id) || 0) + count)
+      }
+    }
+    const modelViewsTotal = [...modelViewCounts.values()].reduce((s, c) => s + c, 0)
+    const modelViews = [...modelViewCounts.entries()]
+      .map(([id, count]) => ({ id, name: models.get(id)?.name || 'Модель удалена', count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+    const formStarts = days.reduce((sum, d) => sum + (data.metrics.formStarts[d] || 0), 0)
+    const aiChatOpens = days.reduce((sum, d) => sum + (data.metrics.aiChatOpens[d] || 0), 0)
+
     return {
       month: m,
       days: [...byDay.values()],
@@ -1281,6 +1346,10 @@ export const dashboard = {
       byModel,
       byRegion,
       bySource,
+      modelViews,
+      modelViewsTotal,
+      formStarts,
+      aiChatOpens,
       requests: inMonth.length,
       kp: inMonth.filter((r) => r.type === 'КП').length,
       calls: inMonth.filter((r) => r.type === 'Звонок').length,

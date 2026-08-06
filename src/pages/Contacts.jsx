@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
@@ -102,6 +102,15 @@ export default function Contacts() {
   const [consent, setConsent] = useState(false)
   const telHref = `tel:${settings.phone.replace(/[^\d+]/g, '')}`
 
+  // Приватный счётчик «начали заполнять форму» — по первому фокусу в любом
+  // поле, один раз за визит на страницу (см. server/store.js metrics).
+  const startedRef = useRef(false)
+  const markStarted = () => {
+    if (startedRef.current) return
+    startedRef.current = true
+    api.metric('form_start').catch(() => {})
+  }
+
   async function submit(e) {
     e.preventDefault()
     const f = e.target
@@ -190,7 +199,7 @@ export default function Contacts() {
               {t('fb_lead')}
             </p>
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} onFocus={markStarted}>
               {error && <div className="form-error">{error}</div>}
               <div className="field">
                 <label htmlFor="c_name">{t('f_name')}</label>

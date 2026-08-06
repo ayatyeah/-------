@@ -18,6 +18,13 @@ function KPDialog() {
     api.regions().then(setRegions).catch(() => setRegions([]))
   }, [])
 
+  // Приватный счётчик «начали заполнять форму» — сама заявка это уже
+  // «отправили», а этот счётчик отдельно ловит открытых, но не дошедших до
+  // отправки (см. server/store.js metrics).
+  useEffect(() => {
+    api.metric('form_start').catch(() => {})
+  }, [])
+
   async function submit(e) {
     e.preventDefault()
     const f = e.target
@@ -108,6 +115,10 @@ function CallDialog() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [consent, setConsent] = useState(false)
+
+  useEffect(() => {
+    api.metric('form_start').catch(() => {})
+  }, [])
 
   async function submit(e) {
     e.preventDefault()

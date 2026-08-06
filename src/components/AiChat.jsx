@@ -44,6 +44,15 @@ export default function AiChat() {
     if (open) inputRef.current?.focus()
   }, [open])
 
+  // Приватный счётчик открытий AI-чата — раз за вкладку, как и счётчик
+  // визитов (см. App.jsx), без cookie и идентификаторов.
+  useEffect(() => {
+    if (!open) return
+    if (sessionStorage.getItem('shm_ai_chat_opened')) return
+    sessionStorage.setItem('shm_ai_chat_opened', '1')
+    api.metric('ai_chat_open').catch(() => {})
+  }, [open])
+
   // Esc закрывает панель.
   useEffect(() => {
     if (!open) return

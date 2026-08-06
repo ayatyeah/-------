@@ -148,6 +148,14 @@ function DashboardSection({ summary, onMonthChange }) {
   const days = dash.days
   const dayLabels = days.map((d) => String(Number(d.date.slice(-2))))
 
+  // Конверсия начатых форм в реально отправленные заявки — начатых бывает
+  // меньше, чем заявок (звонок можно оставить и без формы), тогда просто не
+  // показываем процент, чтобы не вводить в заблуждение числом больше 100%.
+  const formConvPct =
+    dash.formStarts > 0 && dash.formStarts >= dash.requests
+      ? Math.round((dash.requests / dash.formStarts) * 100)
+      : null
+
   const kpis = [
     { v: dash.requests, k: 'заявок за месяц' },
     { v: dash.kp, k: 'запросов КП' },
@@ -158,6 +166,13 @@ function DashboardSection({ summary, onMonthChange }) {
       k: `среднее время обработки${dash.resolvedCount ? ` (${dash.resolvedCount})` : ''}`,
       small: true,
     },
+    { v: dash.modelViewsTotal, k: 'просмотров карточек моделей' },
+    {
+      v: dash.formStarts,
+      k: `начатых форм${formConvPct != null ? ` (конверсия ${formConvPct}%)` : ''}`,
+      small: formConvPct != null,
+    },
+    { v: dash.aiChatOpens, k: 'открытий AI-чата' },
   ]
 
   return (
@@ -245,6 +260,11 @@ function DashboardSection({ summary, onMonthChange }) {
               { label: 'Обработана', value: dash.statusCounts['Обработана'] || 0, color: 'var(--green-800)' },
             ]}
           />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>Просмотры карточек моделей</h4>
+          <BarList items={dash.modelViews.map((m) => ({ label: m.name, value: m.count }))} color="var(--brass-500)" />
         </div>
 
         <div className="admin-panel dash-chart-card">

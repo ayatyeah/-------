@@ -51,6 +51,17 @@ export default function ModelPage() {
     window.scrollTo(0, 0)
   }, [id])
 
+  // Приватный счётчик просмотров карточки — раз за вкладку на модель, как и
+  // общий счётчик визитов (см. App.jsx). Без cookie и идентификаторов,
+  // только +1 к дневному счётчику этой модели для сводки в админке.
+  useEffect(() => {
+    if (!m) return
+    const key = `shm_viewed_${m.id}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    api.metric('model_view', m.id).catch(() => {})
+  }, [m])
+
   if (loading) {
     return (
       <main className="wrap" style={{ paddingBlock: 56 }}>

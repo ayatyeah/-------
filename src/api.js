@@ -50,6 +50,11 @@ export const api = {
   /** Маячок визита — раз за вкладку браузера, см. src/App.jsx. */
   visit: () => request('/visit', { method: 'POST' }),
 
+  /** Те же приватные счётчики без cookie, что и visit(), только по трём
+      дополнительным событиям: просмотр карточки модели, начало заполнения
+      формы, открытие AI-чата (см. server/index.js POST /api/metrics). */
+  metric: (type, modelId) => request('/metrics', { method: 'POST', body: { type, modelId } }),
+
   // --- ИИ ---
   ai: {
     /** Какой движок отвечает: gemini, openai или rules (правила без ИИ). */
