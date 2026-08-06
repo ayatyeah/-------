@@ -23,6 +23,94 @@
 # ============================================================================
 
 services:
+  # ------------------------------ база данных -------------------------------
+  #  Второй экземпляр данных сайта. ВАЖНО понимать, чем он не является:
+  #  сайт от этого контейнера не зависит. Упал, не поднялся, удалён вовсе —
+  #  web продолжает работать на своём файле (см. server/db.js). Проверено
+  #  испытанием: остановка базы `-m immediate` под потоком заявок не привела
+  #  ни к одной потерянной заявке и ни к одной ошибке у посетителя.
+  #
+  #  Наружу не смотрит: ports нет сознательно, ходить в базу может только
+  #  web по внутренней сети compose. Открытый в интернет 5432 — это
+  #  круглосуточный перебор пароля, и он не нужен ни для чего.
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    init: true
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shmagro}
+      POSTGRES_USER: ${POSTGRES_USER:-shmagro}
+      # Пароль обязателен и берётся из .env. Значения по умолчанию здесь нет
+      # намеренно: с ним первый же запуск молча создал бы базу с паролем из
+      # публичного репозитория.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}
+      # scram-sha-256 вместо md5: md5 в Postgres считается устаревшим.
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256 --auth-local=scram-sha-256'
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    # Только внутренняя сеть. Строка подключения — postgres:5432.
+    expose:
+      - '5432'
+
+    volumes:
+      # ОТДЕЛЬНЫЙ том, не тот же, что у сайта. Это не мелочь: смысл второй
+      # копии в том, чтобы одна беда не забрала обе. Общий том вернул бы нас
+      # к одной точке отказа.
+      - shm-pgdata:/var/lib/postgresql/data
+
+    # ─── Настройка под маленький VPS ─────────────────────────────────────
+    # Значения Postgres по умолчанию рассчитаны на выделенный сервер. На
+    # машине с 1–2 ГБ, где рядом живут сайт и Caddy, они приводят к тому,
+    # что OOM-killer убивает не базу, а что попадётся.
+    command:
+      - postgres
+      - '-c'
+      - 'max_connections=${PG_MAX_CONNECTIONS:-20}'
+      - '-c'
+      - 'shared_buffers=${PG_SHARED_BUFFERS:-96MB}'
+      - '-c'
+      - 'work_mem=4MB'
+      - '-c'
+      - 'maintenance_work_mem=32MB'
+      - '-c'
+      - 'effective_cache_size=256MB'
+      # Журнал упреждающей записи не должен разрастаться на маленьком диске.
+      - '-c'
+      - 'max_wal_size=512MB'
+      - '-c'
+      - 'min_wal_size=80MB'
+      # Логируем только медленные запросы и ошибки: полный лог на слабом
+      # диске сам становится причиной тормозов.
+      - '-c'
+      - 'log_min_duration_statement=1000'
+
+    mem_limit: ${PG_MEM_LIMIT:-384m}
+    mem_reservation: 128m
+    cpus: ${PG_CPUS:-0.75}
+    pids_limit: 96
+
+    security_opt:
+      - no-new-privileges:true
+
+    # Даём базе завершить контрольную точку. Убитая на середине запись —
+    # это долгое восстановление при следующем старте.
+    stop_grace_period: 30s
+
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-shmagro} -d ${POSTGRES_DB:-shmagro} -q']
+      interval: 15s
+      timeout: 5s
+      # Первый запуск создаёт кластер — это дольше обычного старта.
+      start_period: 60s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   # ---------------------------------- сайт ---------------------------------
   web:
     build:
@@ -69,10 +157,31 @@ services:
       # Порог, после которого сервер сам пишет в лог, что памяти мало.
       HEAP_WARN_MB: ${HEAP_WARN_MB:-260}
 
+      # ─── Подключение к базе ───────────────────────────────────────────
+      # postgres — имя сервиса выше во внутренней сети compose. Пусто (или
+      # сервис удалён из файла) — сайт работает только на store.json, и это
+      # не вызовет ни ошибки, ни предупреждения посетителю.
+      DATABASE_URL: postgres://${POSTGRES_USER:-shmagro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-shmagro}
+      # Кто главный при расхождении файла и базы: auto | json | db.
+      # auto разбирается сам — см. decideSource() в server/db.js.
+      DB_SOURCE: ${DB_SOURCE:-auto}
+      # Как часто память сверяется с базой, мс.
+      DB_SYNC_MS: ${DB_SYNC_MS:-3000}
+
     # Пароль администратора, ключи ИИ и секрет сессий берутся отсюда.
     # Файл .env лежит рядом с этим файлом на сервере и в git не хранится.
     env_file:
       - .env
+
+    # ─── Зависимость от базы — намеренно слабая ──────────────────────────
+    # service_started, а НЕ service_healthy. Разница принципиальная: с
+    # service_healthy больная база задерживала бы старт сайта до минуты, а
+    # не поднявшаяся вовсе — не давала бы ему стартовать никогда. Сайт же
+    # работоспособен без базы полностью, и ждать её ему не за чем.
+    # Здесь мы просим Docker только о порядке запуска, а не об условии.
+    depends_on:
+      postgres:
+        condition: service_started
 
     volumes:
       # Данные и фотографии переживают пересборку образа и перезапуск.
@@ -215,6 +324,51 @@ services:
         max-size: '5m'
         max-file: '3'
 
+  # ---------------------------- бэкапы базы --------------------------------
+  # Отдельный сервис, а не команда внутри backup: там образ alpine, в котором
+  # нет pg_dump. Здесь берём тот же образ, что и сама база, — версии дампа и
+  # сервера тогда гарантированно совпадают.
+  #
+  # Копия базы дополняет копию файла, а не заменяет её. Файл — это то, из
+  # чего сайт поднимется мгновенно; дамп — то, из чего восстанавливаются
+  # индексы и что можно залить в другую базу.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    init: true
+
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-shmagro}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-shmagro}
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_EVERY: ${BACKUP_EVERY:-86400}
+
+    volumes:
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+
+    # Здесь ждать здоровья базы уместно: без неё дампу просто нечего делать.
+    # На сайт эта зависимость никак не влияет — он в другой ветке графа.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    command: ['sh', '/scripts/pg-backup-loop.sh']
+
+    mem_limit: 128m
+    pids_limit: 32
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: '5m'
+        max-file: '3'
+
   # ------------------------ восстановление из копии -------------------------
   # Сам не запускается: включается только вручную, когда данные нужно вернуть.
   #
@@ -241,7 +395,36 @@ services:
       - ./scripts:/scripts:ro
     command: ['sh', '/scripts/restore.sh']
 
+  # --------------------- восстановление базы из дампа -----------------------
+  # Сам не запускается. Нужен, когда потерян том с базой, а дамп остался:
+  #
+  #     docker compose stop web
+  #     docker compose run --rm pg-restore
+  #     docker compose start web
+  #
+  # Сайт останавливают потому, что при живом сайте полная сверка зальёт в
+  # свежевосстановленную базу содержимое памяти и затрёт восстановленное.
+  #
+  # Если потерян том с базой, а store.json на месте — восстанавливать
+  # вручную не нужно вообще: сайт увидит пустую базу и перенесёт всё сам.
+  pg-restore:
+    image: postgres:16-alpine
+    profiles: ['tools']
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-shmagro}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-shmagro}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./backups:/backups:ro
+      - ./scripts:/scripts:ro
+    command: ['sh', '/scripts/pg-restore.sh']
+
 volumes:
   shm-data:
+  # Том базы — сознательно отдельный от shm-data. Смысл второй копии в том,
+  # чтобы одна беда не забрала обе; общий том вернул бы одну точку отказа.
+  shm-pgdata:
   caddy-data:
   caddy-config:

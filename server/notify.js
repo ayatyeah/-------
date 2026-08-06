@@ -38,13 +38,43 @@ export async function notifyNewRequest(r) {
     'Открыть админку и перезвонить.',
   ].filter(Boolean)
 
+  await notifyText(lines.join('\n'))
+}
+
+/**
+ * Произвольное техническое сообщение тем же каналом.
+ *
+ * Появилось ради состояния базы данных: сайт продолжает работать и без
+ * неё, поэтому посетитель проблемы не увидит — и владелец не увидит тоже,
+ * пока не понадобится выгрузка. Один сигнал в тот же чат закрывает разрыв.
+ *
+ * Как и уведомление о заявке, ничего не бросает: сбой Telegram — не повод
+ * ронять то, ради чего мы его звали.
+ *
+ * Одинаковые сообщения подряд не шлём. База, которая моргает раз в минуту,
+ * иначе превратила бы чат заявок в поток одинаковых строк, и настоящие
+ * заявки в нём бы потерялись.
+ */
+let последнее = ''
+let последнееВремя = 0
+const ПОВТОР_МС = 10 * 60 * 1000
+
+export async function notifyText(text, { dedupe = true } = {}) {
+  if (!notifyEnabled()) return
+  const msg = String(text || '').slice(0, 3500)
+  if (!msg) return
+
+  if (dedupe && msg === последнее && Date.now() - последнееВремя < ПОВТОР_МС) return
+  последнее = msg
+  последнееВремя = Date.now()
+
   try {
     const res = await fetch(`https://api.telegram.org/bot${token()}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId(),
-        text: lines.join('\n'),
+        text: msg,
         disable_web_page_preview: true,
       }),
       signal: AbortSignal.timeout(8000),

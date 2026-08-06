@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useSite } from '../store'
 import Icon from './Icon'
@@ -1033,6 +1033,145 @@ export function BackupPanel() {
       <button type="button" className="btn btn-secondary" onClick={download} disabled={busy}>
         {busy ? 'Готовим файл…' : 'Скачать копию'}
       </button>
+    </div>
+  )
+}
+
+/* ------------------------- состояние базы данных --------------------------- */
+
+/**
+ * Что с базой. Экран нужен по неочевидной причине: сайт работает и без базы,
+ * поэтому её недоступность ничем себя не проявляет — её замечают через месяц,
+ * когда понадобится выгрузка. Здесь это видно сразу.
+ */
+export function DatabasePanel() {
+  const { showToast } = useSite()
+  const [состояние, setСостояние] = useState(null)
+  const [ошибка, setОшибка] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const загрузить = useCallback(async () => {
+    try {
+      setСостояние(await api.admin.dbStatus())
+      setОшибка('')
+    } catch (e) {
+      setОшибка(e.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    загрузить()
+    // Обновляем сами: состояние меняется без участия человека, и открытая
+    // вкладка не должна показывать позавчерашнюю картину.
+    const t = setInterval(загрузить, 20_000)
+    return () => clearInterval(t)
+  }, [загрузить])
+
+  async function перелить() {
+    setBusy(true)
+    try {
+      await api.admin.dbResync()
+      showToast('Данные перелиты в базу')
+      await загрузить()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (ошибка) {
+    return (
+      <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+        <h3>База данных</h3>
+        <p className="admin-hint">Не удалось получить состояние: {ошибка}</p>
+      </div>
+    )
+  }
+  if (!состояние) return null
+
+  const { state, configured, lastSyncAt, counts, lastError, downSince, syncs, reconnects } = состояние
+
+  const вид = {
+    off: { цвет: '#6b7280', текст: 'Не подключена' },
+    up: { цвет: '#16a34a', текст: 'Работает' },
+    down: { цвет: '#dc2626', текст: 'Недоступна' },
+    starting: { цвет: '#ca8a04', текст: 'Подключается' },
+  }[state] || { цвет: '#6b7280', текст: state }
+
+  const когда = (iso) => {
+    if (!iso) return '—'
+    const сек = Math.round((Date.now() - new Date(iso)) / 1000)
+    if (сек < 60) return `${сек} с назад`
+    if (сек < 3600) return `${Math.round(сек / 60)} мин назад`
+    return new Date(iso).toLocaleString('ru-RU')
+  }
+
+  return (
+    <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+      <h3>
+        База данных{' '}
+        <span
+          style={{
+            display: 'inline-block',
+            padding: '2px 10px',
+            marginLeft: 8,
+            borderRadius: 999,
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#fff',
+            background: вид.цвет,
+            verticalAlign: 'middle',
+          }}
+        >
+          {вид.текст}
+        </span>
+      </h3>
+
+      {!configured && (
+        <p className="admin-hint">
+          База не подключена — сайт работает на файле данных. Это рабочий режим: всё
+          сохраняется и никуда не пропадает. База нужна как вторая копия и для выгрузок.
+        </p>
+      )}
+
+      {state === 'down' && (
+        <p className="admin-hint" style={{ color: '#b91c1c' }}>
+          <strong>Сайт при этом работает нормально.</strong> Заявки принимаются, правки
+          сохраняются — всё пишется в файл, как и раньше. Когда база вернётся, данные
+          зальются в неё сами, ничего не потеряется. Недоступна с {когда(downSince)}.
+          {lastError ? ` Причина: ${lastError}` : ''}
+        </p>
+      )}
+
+      {state === 'up' && (
+        <>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Копия данных в базе обновлена {когда(lastSyncAt)}. Сверок с момента запуска:{' '}
+            {syncs}
+            {reconnects > 0 ? `, переподключений: ${reconnects}` : ''}.
+          </p>
+          {counts && (
+            <p className="admin-hint" style={{ marginBottom: 12 }}>
+              В базе: моделей {counts.models}, новостей {counts.news}, заявок{' '}
+              {counts.requests}, категорий {counts.categories}.
+            </p>
+          )}
+        </>
+      )}
+
+      {configured && (
+        <>
+          <button type="button" className="btn btn-secondary" onClick={перелить} disabled={busy}>
+            {busy ? 'Переливаем…' : 'Перелить заново'}
+          </button>
+          <p className="admin-hint" style={{ marginTop: 10 }}>
+            Приводит базу к тому, что сайт показывает сейчас. Безопасно в любой момент:
+            ничего не удаляет с сайта. Нужно редко — например, если базу правили в обход
+            админки.
+          </p>
+        </>
+      )}
     </div>
   )
 }

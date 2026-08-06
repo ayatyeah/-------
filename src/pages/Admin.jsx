@@ -13,6 +13,7 @@ import {
   RegionsPanel,
   PasswordPanel,
   BackupPanel,
+  DatabasePanel,
 } from '../components/AdminPanels'
 import Icon from '../components/Icon'
 import { LineChart, StackedBarChart, Donut } from '../components/Charts'
@@ -973,6 +974,7 @@ function SettingsTab({ onRelogin }) {
         <RegionsPanel />
         <PasswordPanel onRelogin={onRelogin} />
         <BackupPanel />
+        <DatabasePanel />
       </div>
     </>
   )

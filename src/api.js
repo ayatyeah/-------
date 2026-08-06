@@ -192,6 +192,12 @@ export const api = {
       // Ссылку освобождаем, иначе браузер держит копию файла в памяти.
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
+
+    /** Состояние базы данных: доступна ли, когда сверялась, сколько строк. */
+    dbStatus: () => request('/admin/db', { auth: true }),
+
+    /** Перелить содержимое сайта в базу заново. */
+    dbResync: () => request('/admin/db/resync', { method: 'POST', auth: true }),
   },
 }
 
