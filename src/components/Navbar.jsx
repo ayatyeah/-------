@@ -6,6 +6,13 @@ import Icon from './Icon'
 import LangSwitcher from './LangSwitcher'
 import { useT } from '../i18n'
 
+/* Ссылки на админку в этом меню нет и быть не должно.
+   Раньше «Админка» стояла рядом с «Контактами» — то есть каждому
+   посетителю показывали, где вход в панель управления. Это не защита
+   (адрес /admin легко угадать), но приглашение: подобрать пароль пробует
+   тот, кто видит форму входа, а не тот, кто о ней не думал.
+   Владелец заходит по прямому адресу /admin и держит его в закладке. */
+
 // label — ключ словаря: подписи переводятся вместе с языком сайта.
 const LINKS = [
   { to: '/catalog', label: 'nav_catalog' },
@@ -51,10 +58,6 @@ export default function Navbar() {
           {t('get_kp')}
         </button>
 
-        <NavLink to="/admin" className="navlink nav-admin hide-sm">
-          {t('nav_admin')}
-        </NavLink>
-
         {/* Когда меню сворачивается в бургер, звонок должен остаться под рукой. */}
         <a className="nav-phone-sm" href={telHref} aria-label={`${t('nav_call_aria')} ${settings.phone}`}>
           <Icon name="phone" size={18} />
@@ -79,9 +82,6 @@ export default function Navbar() {
             {t(l.label)}
           </NavLink>
         ))}
-        <NavLink to="/admin" className="navlink" onClick={close}>
-          {t('nav_admin')}
-        </NavLink>
         <a className="navlink" href={telHref}>
           {settings.phone}
         </a>

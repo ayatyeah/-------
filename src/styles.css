@@ -5057,3 +5057,22 @@ select.input {
   margin-top: 12px;
 }
 .lang-switch--block .lang-btn { flex: 1; padding-block: 9px; }
+
+/* Текст только для экранных дикторов.
+
+   Нужен там, где смысл передан визуально, а вслух не читается: кто автор
+   реплики в чате, что ответ сейчас готовится. Прятать такое через
+   display:none или visibility:hidden нельзя — диктор пропустит их вместе
+   с остальным содержимым. Поэтому элемент остаётся в потоке, но
+   схлопнут в точку и обрезан. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

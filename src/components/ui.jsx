@@ -62,6 +62,17 @@ export function Loading({ count = 3 }) {
   )
 }
 
+/**
+ * Экран «не загрузилось».
+ *
+ * Раньше здесь посетителю сайта показывали строчку «Проверьте, запущен ли
+ * сервер: npm run dev:server». Это подсказка разработчику, случайно
+ * попавшая на живой сайт: фермеру она не говорит ничего, зато сообщает
+ * любому, чем сайт собран и что администратор до него не добрался.
+ *
+ * Теперь посетитель видит то, что может сделать сам, а команда запуска
+ * остаётся только в режиме разработки — там она и правда полезна.
+ */
 export function ErrorState({ message, onRetry }) {
   const { t } = useT()
   return (
@@ -70,7 +81,17 @@ export function ErrorState({ message, onRetry }) {
       <p style={{ marginBottom: 18 }}>
         {message}
         <br />
-        {t('err_hint')} <code>npm run dev:server</code>
+        {t('err_hint')}
+        {/* import.meta.env.DEV вырезается при сборке продакшена целиком —
+            на боевой сайт этот блок не попадает даже в виде мёртвого кода. */}
+        {import.meta.env.DEV && (
+          <>
+            <br />
+            <small style={{ opacity: 0.7 }}>
+              Разработка: проверьте, запущен ли сервер — <code>npm run dev:server</code>
+            </small>
+          </>
+        )}
       </p>
       {onRetry && (
         <button type="button" className="btn btn-secondary" onClick={onRetry}>

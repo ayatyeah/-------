@@ -106,19 +106,44 @@ export default function AiChat() {
             </button>
           </header>
 
-          <div className="ai-body" ref={bodyRef}>
+          {/* role="log" + aria-live="polite": экранный диктор читает новые
+              реплики по мере появления. Без этого незрячий посетитель
+              отправлял вопрос и оставался в тишине — ответ приходил, но
+              диктору никто не сообщал, что на странице что-то изменилось,
+              и чат для него был неработающим.
+
+              polite, а не assertive: ответ дочитывается после текущей
+              фразы диктора, а не перебивает её на полуслове. */}
+          <div
+            className="ai-body"
+            ref={bodyRef}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-label={t('ai_log_aria')}
+          >
             {messages.map((m, i) => (
               <div key={i} className={`ai-msg ai-msg--${m.role}`}>
+                {/* Кто говорит — тоже вслух: без этого реплики посетителя и
+                    ответы сливаются в один поток без границ. */}
+                <span className="visually-hidden">
+                  {m.role === 'assistant' ? t('ai_role_bot') : t('ai_role_you')}:{' '}
+                </span>
                 {m.text}
               </div>
             ))}
 
             {busy && (
-              <div className="ai-msg ai-msg--assistant ai-typing">
-                <i />
-                <i />
-                <i />
-              </div>
+              <>
+                {/* Многоточие набора — чисто визуальная анимация, диктору её
+                    читать нечего. Ему нужен факт: ответ готовится. */}
+                <div className="ai-msg ai-msg--assistant ai-typing" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <span className="visually-hidden">{t('ai_thinking_aria')}</span>
+              </>
             )}
 
             {messages.length === 1 && !busy && (

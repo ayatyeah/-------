@@ -13,6 +13,81 @@ const SOCIAL = [
   { key: 'whatsapp_url', name: 'WhatsApp' },
 ]
 
+/**
+ * Карта проезда — по нажатию.
+ *
+ * Почему не сразу: встроенная карта — это чужой iframe, и он отправляет
+ * адрес посетителя в 2ГИС или Яндекс ещё до того, как человек что-либо
+ * нажал. Сайт при этом честно спрашивает согласие на аналитику и обещает,
+ * что данные остаются в Казахстане, — молча загруженная карта делала бы
+ * это обещание неправдой, а кнопку «Только необходимые» — декоративной.
+ *
+ * Поэтому до нажатия не уходит ни одного запроса: показываем адрес и
+ * обычную ссылку «Открыть в 2ГИС», которая работает всегда и никого ни о
+ * чём не спрашивает. Нажал «Показать карту» — значит согласился, тогда и
+ * грузим.
+ *
+ * Ссылка на карту задаётся в админке (настройка map_embed_url). Пустая —
+ * блок показывает адрес и ссылку, без встраивания: заглушка «здесь будет
+ * карта», которая стояла раньше, доверия не прибавляла.
+ */
+function MapBlock() {
+  const { settings } = useSite()
+  const { t } = useT()
+  const [shown, setShown] = useState(false)
+
+  const embed = settings.map_embed_url || ''
+  const address = settings.address || ''
+  const searchUrl = `https://2gis.kz/search/${encodeURIComponent(address)}`
+
+  if (!embed || !shown) {
+    return (
+      <div className="map-stub">
+        <div className="media-stub" style={{ flexDirection: 'column', gap: 12, padding: 20 }}>
+          <span style={{ textAlign: 'center' }}>{address || t('map_stub')}</span>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {embed && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setShown(true)}>
+                {t('map_show')}
+              </button>
+            )}
+            {address && (
+              <a
+                className="btn btn-secondary btn-sm"
+                href={searchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t('map_open_2gis')}
+              </a>
+            )}
+          </div>
+          {embed && (
+            <small style={{ opacity: 0.7, textAlign: 'center', maxWidth: 320 }}>
+              {t('map_privacy_note')}
+            </small>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="map-stub">
+      <iframe
+        src={embed}
+        title={t('map_iframe_title')}
+        loading="lazy"
+        // Чужому фрейму не нужны ни камера, ни микрофон, ни геолокация:
+        // забираем их явно, чтобы карта не могла даже спросить.
+        allow=""
+        referrerPolicy="no-referrer"
+        style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+      />
+    </div>
+  )
+}
+
 export default function Contacts() {
   usePageMeta({
     title: 'Контакты завода сельхозтехники',
@@ -104,11 +179,7 @@ export default function Contacts() {
               </button>
             </div>
 
-            <div className="map-stub">
-              <div className="media-stub">
-                <span>{t('map_stub')}</span>
-              </div>
-            </div>
+            <MapBlock />
           </Reveal>
 
           <Reveal className="form-panel frame" variant="right" delay={120}>

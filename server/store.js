@@ -1090,8 +1090,16 @@ const SETTING_KEYS = [
   'hero_subtitle',
   'hero_photo',
   'about_photo',
+  /* Ссылка на встраиваемую карту (2ГИС или Яндекс.Карты). Задаётся в
+     админке: заказчик переезжает — меняет ссылку сам, без разработчика.
+     Пустая — на «Контактах» показывается адрес текстом и ссылка «Открыть
+     в картах», без встраивания. */
+  'map_embed_url',
 ]
-const URL_KEYS = new Set(['leasing_url', 'subsidy_url', 'instagram_url', 'telegram_url', 'whatsapp_url'])
+const URL_KEYS = new Set([
+  'leasing_url', 'subsidy_url', 'instagram_url', 'telegram_url', 'whatsapp_url',
+  'map_embed_url',
+])
 /* Фото на главной и на странице «О компании» — не ссылка, а путь к своей
    картинке (/assets/… из комплекта или /uploads/… из библиотеки), поэтому
    проверяются той же safeMedia(), что и фото модели, а не safeUrl(). */

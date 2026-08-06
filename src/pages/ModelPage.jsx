@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useFetch, useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
@@ -11,6 +11,18 @@ import { useT } from '../i18n'
 export default function ModelPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+
+  /* Куда возвращает «Назад в каталог».
+
+     Категорию приносит адрес карточки (см. toModel в src/pages/Catalog.jsx),
+     и мы возвращаем посетителя ровно к тому списку, из которого он пришёл,
+     а не ко всему каталогу заново.
+
+     navigate(-1) здесь не годится: на карточку часто попадают прямо из
+     поиска или по присланной ссылке, и «назад» уводил бы с сайта вовсе. */
+  const [params] = useSearchParams()
+  const catBack = params.get('cat')
+  const backToCatalog = () => navigate(catBack ? `/catalog?cat=${catBack}` : '/catalog')
   const { settings, openKP, openCall } = useSite()
   const { t, td } = useT()
   const tiltRef = useTilt(7)
@@ -52,7 +64,7 @@ export default function ModelPage() {
       <main className="wrap">
         <ErrorState message={error} onRetry={reload} />
         <div style={{ textAlign: 'center', paddingBottom: 60 }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/catalog')}>
+          <button type="button" className="btn btn-secondary" onClick={backToCatalog}>
             {t('back_catalog')}
           </button>
         </div>
@@ -62,7 +74,7 @@ export default function ModelPage() {
 
   return (
     <main className="wrap route-fade" style={{ paddingBlock: '36px 72px' }}>
-      <button type="button" className="back-link" onClick={() => navigate('/catalog')}>
+      <button type="button" className="back-link" onClick={backToCatalog}>
         {t('back_catalog')}
       </button>
 

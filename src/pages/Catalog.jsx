@@ -36,6 +36,18 @@ export default function Catalog() {
 
   const pick = (id) => setParams(id === 'all' ? {} : { cat: id })
 
+  /* Адрес карточки модели с сохранением выбранной категории.
+
+     Раньше из карточки возвращались в каталог без фильтра: посетитель
+     отбирал «Посевную технику», открывал одну сеялку, жал «назад» — и
+     получал весь каталог заново. На сорока моделях это означает искать
+     сначала, и на этом уходят с сайта.
+
+     Категорию кладём в адрес, а не в состояние роутера, сознательно: так
+     фильтр переживает обновление страницы и остаётся в ссылке, которой
+     делятся с агрономом или бухгалтером. */
+  const toModel = (id) => `/catalog/${id}${cat !== 'all' ? `?cat=${cat}` : ''}`
+
   return (
     <main className="route-fade">
       <div className="wrap page-head">
@@ -88,20 +100,20 @@ export default function Catalog() {
                             название и «Подробнее»: все ведут к модели и
                             доступны с клавиатуры. */}
                         <article className="card card--link" style={{ height: '100%' }}>
-                          <Link to={`/catalog/${m.id}`} className="card-media" aria-label={m.name}>
+                          <Link to={toModel(m.id)} className="card-media" aria-label={m.name}>
                             {m.subsidized && <span className="tag tag-brass">{t('subsidized')}</span>}
                             <Media src={m.photo} alt={m.name} stub={td(m.catName)} />
                           </Link>
                           <div className="card-body">
                             <span className="card-kicker">{td(m.catName)}</span>
                             <h3 className="card-title">
-                              <Link to={`/catalog/${m.id}`} className="card-title-link">
+                              <Link to={toModel(m.id)} className="card-title-link">
                                 {m.name}
                               </Link>
                             </h3>
                             <p className="card-text">{m.short}</p>
                             <div className="card-actions">
-                              <Link to={`/catalog/${m.id}`} className="btn btn-primary btn-sm">
+                              <Link to={toModel(m.id)} className="btn btn-primary btn-sm">
                                 {t('more')}
                               </Link>
                               <button

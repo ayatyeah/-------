@@ -832,6 +832,7 @@ const SETTINGS_FIELD_LABELS = {
   whatsapp_url: 'WhatsApp',
   hero_title: 'Заголовок героя',
   hero_subtitle: 'Подзаголовок',
+  map_embed_url: 'Карта на «Контактах»',
 }
 
 function SettingsTab({ onRelogin }) {
@@ -928,6 +929,23 @@ function SettingsTab({ onRelogin }) {
           {field('address', 'Адрес')}
           {field('hours', 'Часы работы')}
           {saveButton('contacts', ['phone', 'email', 'address', 'hours'], 'Контакты')}
+        </div>
+
+        <div className="admin-settings-panel">
+          <h3>Карта проезда</h3>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Ссылка на встраиваемую карту 2ГИС или Яндекс.Карт. Где взять: откройте
+            карту, найдите свою точку, «Поделиться» → «Встроить на сайт» и скопируйте
+            адрес из <code>src=&quot;…&quot;</code>. Должен начинаться с https://.
+          </p>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Пустое поле — на «Контактах» показывается адрес и ссылка «Открыть в 2ГИС»,
+            без встроенной карты. Сама карта в любом случае загружается только после
+            того, как посетитель нажмёт «Показать карту»: до нажатия его данные
+            в 2ГИС не уходят.
+          </p>
+          {field('map_embed_url', 'Ссылка на карту', 'input', 'https://2gis.kz/…/firm/…')}
+          {saveButton('map', ['map_embed_url'], 'Карта')}
         </div>
 
         <div className="admin-settings-panel">
