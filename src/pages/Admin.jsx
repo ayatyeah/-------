@@ -15,7 +15,7 @@ import {
   BackupPanel,
 } from '../components/AdminPanels'
 import Icon from '../components/Icon'
-import { LineChart, StackedBarChart, Donut } from '../components/Charts'
+import { LineChart, StackedBarChart, Donut, BarList, FunnelChart } from '../components/Charts'
 import usePageMeta from '../hooks/usePageMeta'
 
 const TABS = [
@@ -118,6 +118,9 @@ function shiftMonth(m, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** «2026-08-03» → «3» — короткая подпись начала недели под графиком. */
+const weekLabel = (iso) => String(Number(iso.slice(-2)))
+
 /**
  * Помесячный дашборд: KPI-карточки и графики. Диапазон месяцев, между
  * которыми можно переключаться, приходит от сервера (availableMonths) —
@@ -213,6 +216,50 @@ function DashboardSection({ summary, onMonthChange }) {
               { label: 'Обработана', value: dash.statusCounts['Обработана'] || 0, color: 'var(--green-800)' },
             ]}
           />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>Заявки по неделям</h4>
+          <StackedBarChart
+            rows={dash.weeks}
+            keys={['kp', 'calls']}
+            colors={['var(--green-600)', 'var(--brass-500)']}
+            labels={dash.weeks.map((w) => weekLabel(w.weekStart))}
+          />
+          <div className="chart-legend">
+            <span>
+              <i style={{ background: 'var(--green-600)' }} /> КП
+            </span>
+            <span>
+              <i style={{ background: 'var(--brass-500)' }} /> Звонок
+            </span>
+          </div>
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>Воронка по статусам</h4>
+          <FunnelChart
+            stages={[
+              { label: 'Новая', value: dash.statusCounts['Новая'] || 0, color: 'var(--green-400)' },
+              { label: 'В работе', value: dash.statusCounts['В работе'] || 0, color: 'var(--brass-400)' },
+              { label: 'Обработана', value: dash.statusCounts['Обработана'] || 0, color: 'var(--green-800)' },
+            ]}
+          />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>По моделям (запросы КП)</h4>
+          <BarList items={dash.byModel.map((m) => ({ label: m.name, value: m.count }))} color="var(--green-600)" />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>По регионам</h4>
+          <BarList items={dash.byRegion.map((r) => ({ label: r.region, value: r.count }))} color="var(--brass-500)" />
+        </div>
+
+        <div className="admin-panel dash-chart-card">
+          <h4>По источникам</h4>
+          <BarList items={dash.bySource.map((s) => ({ label: s.source, value: s.count }))} color="var(--green-800)" />
         </div>
       </div>
     </>

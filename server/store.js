@@ -940,6 +940,8 @@ export const requests = {
     utmCampaign,
     referrer,
     page,
+    modelId,
+    region,
   }) {
     const r = {
       id: newId('r'),
@@ -968,6 +970,11 @@ export const requests = {
       utmCampaign: utmCampaign || '',
       referrer: referrer || '',
       page: page || '',
+      // Модель и регион отдельными полями — meta остаётся готовой строкой
+      // для отображения, а эти два поля нужны для разрезов дашборда (задача
+      // 6), где строку пришлось бы разбирать обратно на части.
+      modelId: modelId || '',
+      region: region || '',
     }
     data.requests.unshift(r)
     // Заявку — сразу на диск, не через отложенный save(): показать клиенту
@@ -1084,9 +1091,79 @@ export const dashboard = {
         )
       : null
 
+    // Недельная динамика — то же самое, что и byDay, но свёрнутое по
+    // неделям (с понедельника): на месяц из 30 дней отдельные точки читать
+    // тяжелее, чем 4-5 недельных.
+    const weekStart = (dateStr) => {
+      const d = new Date(dateStr + 'T00:00:00')
+      const dow = (d.getDay() + 6) % 7 // 0 = понедельник
+      d.setDate(d.getDate() - dow)
+      return d.toISOString().slice(0, 10)
+    }
+    const weeksMap = new Map()
+    for (const row of byDay.values()) {
+      const wk = weekStart(row.date)
+      if (!weeksMap.has(wk)) weeksMap.set(wk, { weekStart: wk, requests: 0, kp: 0, calls: 0, visits: 0 })
+      const w = weeksMap.get(wk)
+      w.requests += row.requests
+      w.kp += row.kp
+      w.calls += row.calls
+      w.visits += row.visits
+    }
+    const weeks = [...weeksMap.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+
+    // Разрез по моделям — только заявки на КП с выбранной моделью (задача 6).
+    const modelCounts = new Map()
+    for (const r of inMonth) {
+      if (!r.modelId) continue
+      modelCounts.set(r.modelId, (modelCounts.get(r.modelId) || 0) + 1)
+    }
+    const byModel = [...modelCounts.entries()]
+      .map(([id, count]) => ({ id, name: models.get(id)?.name || 'Модель удалена', count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+
+    // Разрез по регионам — тоже только там, где регион известен (форма КП).
+    const regionCounts = new Map()
+    for (const r of inMonth) {
+      if (!r.region) continue
+      regionCounts.set(r.region, (regionCounts.get(r.region) || 0) + 1)
+    }
+    const byRegion = [...regionCounts.entries()]
+      .map(([region, count]) => ({ region, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+
+    // Разрез по источникам — utm-метка, иначе домен перехода, иначе прямой
+    // заход. Метки собираются на сайте, см. src/lib/attribution.js.
+    const sourceOf = (r) => {
+      if (r.utmSource) return r.utmSource
+      if (r.referrer) {
+        try {
+          return new URL(r.referrer).hostname.replace(/^www\./, '')
+        } catch {
+          return 'Прямой заход'
+        }
+      }
+      return 'Прямой заход'
+    }
+    const sourceCounts = new Map()
+    for (const r of inMonth) {
+      const key = sourceOf(r)
+      sourceCounts.set(key, (sourceCounts.get(key) || 0) + 1)
+    }
+    const bySource = [...sourceCounts.entries()]
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+
     return {
       month: m,
       days: [...byDay.values()],
+      weeks,
+      byModel,
+      byRegion,
+      bySource,
       requests: inMonth.length,
       kp: inMonth.filter((r) => r.type === 'КП').length,
       calls: inMonth.filter((r) => r.type === 'Звонок').length,

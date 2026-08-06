@@ -98,6 +98,60 @@ export function StackedBarChart({ rows, keys, colors, labels, height = 140 }) {
   )
 }
 
+/** Горизонтальные полосы-рейтинг. items: [{ label, value }], отсортированы
+    заранее вызывающей стороной — компонент только рисует. Для разрезов
+    дашборда по моделям/регионам/источникам: списком нагляднее, чем ещё
+    одним кольцом или столбцами — читается сверху вниз, как рейтинг. */
+export function BarList({ items, color = 'var(--brass-500)' }) {
+  const max = Math.max(1, ...items.map((i) => i.value))
+  if (!items.length) return <p className="chart-empty">Пока нет данных за этот месяц.</p>
+  return (
+    <ul className="bar-list">
+      {items.map((i) => (
+        <li key={i.label}>
+          <span className="bar-list-label" title={i.label}>
+            {i.label}
+          </span>
+          <span className="bar-list-track">
+            <span
+              className="bar-list-fill"
+              style={{ width: `${(i.value / max) * 100}%`, background: color }}
+            />
+          </span>
+          <span className="bar-list-value">{fmt(i.value)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Воронка по стадиям: убывающие по ширине полосы плюс % от первой стадии.
+    stages: [{ label, value, color }], порядок — от первой стадии к последней. */
+export function FunnelChart({ stages }) {
+  const first = stages[0]?.value || 0
+  return (
+    <ul className="funnel">
+      {stages.map((s) => {
+        const pct = first > 0 ? Math.round((s.value / first) * 100) : 0
+        return (
+          <li key={s.label}>
+            <div className="funnel-head">
+              <span>{s.label}</span>
+              <span>
+                {fmt(s.value)}
+                {first > 0 && <i>{pct}%</i>}
+              </span>
+            </div>
+            <div className="funnel-track">
+              <div className="funnel-fill" style={{ width: `${pct}%`, background: s.color }} />
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 /** Кольцевая диаграмма долей с легендой. segments: [{ label, value, color }]. */
 export function Donut({ segments, size = 130 }) {
   const total = segments.reduce((s, x) => s + x.value, 0)

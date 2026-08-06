@@ -2229,6 +2229,87 @@ select.input {
   width: 100%;
 }
 
+.chart-empty {
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 8px 0;
+}
+
+.bar-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bar-list li {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.bar-list-label {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-list-track {
+  height: 8px;
+  border-radius: var(--r-xs);
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.bar-list-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-xs);
+}
+
+.bar-list-value {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.funnel {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.funnel-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+.funnel-head i {
+  font-style: normal;
+  color: var(--text-3);
+  margin-left: 6px;
+}
+
+.funnel-track {
+  height: 10px;
+  border-radius: var(--r-xs);
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.funnel-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-xs);
+}
+
 .admin-settings {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

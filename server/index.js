@@ -808,9 +808,13 @@ app.post('/api/requests', limitRequests, wrap(async (req, res) => {
   }
 
   let metaText = clean(meta, 200) || '—'
+  let cleanModelId = ''
+  let cleanRegion = ''
   if (type === 'КП') {
     const m = modelId ? store.models.get(modelId) : null
-    metaText = `${m ? m.name : 'Общая заявка'} · ${clean(region, 60) || '—'}`
+    cleanModelId = m ? m.id : ''
+    cleanRegion = clean(region, 60)
+    metaText = `${m ? m.name : 'Общая заявка'} · ${cleanRegion || '—'}`
   }
 
   // Запись синхронная (см. store.requests.create): не записалось — сюда
@@ -829,6 +833,8 @@ app.post('/api/requests', limitRequests, wrap(async (req, res) => {
     utmCampaign,
     referrer,
     page,
+    modelId: cleanModelId,
+    region: cleanRegion,
   })
 
   // Отвечаем форме сразу — уведомление в Telegram не должно её задерживать и
