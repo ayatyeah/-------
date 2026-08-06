@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, clearToken, formatDateShort, getToken, setToken } from '../api'
 import { useSite } from '../store'
@@ -808,21 +808,158 @@ const scoresFromRequests = (requests) =>
       .map((r) => [r.id, { priority: r.aiPriority, score: r.aiScore, summary: r.aiSummary, action: r.aiAction }])
   )
 
-function RequestsTab({ requests, reload }) {
-  const { showToast } = useSite()
-  // Оценки ИИ по id заявки — подсвечивают строки таблицы. При открытии
-  // вкладки подхватываем то, что уже сохранено на заявках, а не начинаем
-  // с пустого места.
-  const [scored, setScored] = useState(() => scoresFromRequests(requests))
-  const [sortByScore, setSortByScore] = useState(false)
+const todayISO = () => new Date().toISOString().slice(0, 10)
 
-  const rows = sortByScore
-    ? [...requests].sort((a, b) => (scored[b.id]?.score ?? -1) - (scored[a.id]?.score ?? -1))
-    : requests
+const SORT_COLUMNS = [
+  { key: 'createdAt', label: 'Дата' },
+  { key: 'aiScore', label: 'Балл ИИ' },
+  { key: 'fio', label: 'Имя' },
+  { key: 'status', label: 'Статус' },
+]
+
+const EMPTY_FILTERS = {
+  status: '',
+  type: '',
+  dateFrom: '',
+  dateTo: '',
+  modelId: '',
+  region: '',
+  source: '',
+  q: '',
+  onlyDuplicates: false,
+}
+
+/** Заметка менеджера + дата следующего контакта, сохраняются по уходу из
+    поля (blur) — без отдельной кнопки «Сохранить» на каждую строку. */
+function NotesCell({ r, onSaved }) {
+  const [notes, setNotes] = useState(r.notes || '')
+  const [nextContactAt, setNextContactAt] = useState(r.nextContactAt || '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setNotes(r.notes || '')
+    setNextContactAt(r.nextContactAt || '')
+  }, [r.id, r.notes, r.nextContactAt])
+
+  const save = async (patch) => {
+    setSaving(true)
+    try {
+      const updated = await api.admin.setRequestNotes(r.id, patch)
+      onSaved(updated)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const overdue = nextContactAt && nextContactAt < todayISO() && r.status !== 'Обработана'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 170 }}>
+      <textarea
+        className="input"
+        rows={2}
+        style={{ fontSize: 13, padding: '6px 8px', resize: 'vertical' }}
+        placeholder="Заметка…"
+        value={notes}
+        disabled={saving}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={() => notes !== (r.notes || '') && save({ notes })}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="date"
+          className="input"
+          style={{ fontSize: 12, padding: '5px 7px' }}
+          value={nextContactAt || ''}
+          disabled={saving}
+          onChange={(e) => {
+            const v = e.target.value
+            setNextContactAt(v)
+            save({ nextContactAt: v || null })
+          }}
+        />
+        {overdue && (
+          <span className="tag tag-danger" title="Дата следующего контакта уже прошла">
+            просрочено
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RequestsTab({ requests, reload, models }) {
+  const { showToast } = useSite()
+  // Оценки ИИ по id заявки — подсвечивают строки таблицы. Берутся из
+  // полного списка заявок, а не из текущей страницы, поэтому не зависят от
+  // фильтров и пагинации ниже.
+  const [scored, setScored] = useState(() => scoresFromRequests(requests))
+  useEffect(() => setScored(scoresFromRequests(requests)), [requests])
+
+  const [regions, setRegions] = useState([])
+  useEffect(() => {
+    api.regions().then(setRegions).catch(() => setRegions([]))
+  }, [])
+
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [qInput, setQInput] = useState('')
+  const [page, setPage] = useState(1)
+  const [sortBy, setSortBy] = useState('createdAt')
+  const [sortDir, setSortDir] = useState('desc')
+  const [table, setTable] = useState({ items: [], total: 0, pageSize: 20 })
+  const [tableLoading, setTableLoading] = useState(true)
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkStatus, setBulkStatus] = useState('В работе')
+  const [exporting, setExporting] = useState(false)
+
+  // Текстовый поиск — с задержкой: иначе каждый символ уходил бы отдельным
+  // запросом. Остальные фильтры применяются сразу по изменению.
+  const debounceRef = useRef(null)
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setFilters((f) => (f.q === qInput ? f : { ...f, q: qInput }))
+    }, 350)
+    return () => clearTimeout(debounceRef.current)
+  }, [qInput])
+
+  const loadTable = useCallback(async () => {
+    setTableLoading(true)
+    try {
+      const res = await api.admin.requestsQuery({ ...filters, page, sortBy, sortDir })
+      setTable(res)
+    } catch (e) {
+      showToast(e.message)
+    } finally {
+      setTableLoading(false)
+    }
+  }, [filters, page, sortBy, sortDir, showToast])
+
+  useEffect(() => {
+    loadTable()
+  }, [loadTable])
+
+  // Смена любого фильтра или сортировки возвращает на первую страницу —
+  // иначе легко застрять на «странице 4», где после фильтра уже пусто.
+  const setFilter = (patch) => {
+    setFilters((f) => ({ ...f, ...patch }))
+    setPage(1)
+  }
+  const toggleSort = (key) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortBy(key)
+      setSortDir('desc')
+    }
+    setPage(1)
+  }
 
   const setStatus = async (r, status) => {
     try {
       await api.admin.setRequestStatus(r.id, status)
+      loadTable()
       reload()
     } catch (e) {
       alert(e.message)
@@ -834,11 +971,65 @@ function RequestsTab({ requests, reload }) {
     try {
       await api.admin.deleteRequest(r.id)
       showToast('Заявка удалена')
+      setSelected((s) => {
+        const next = new Set(s)
+        next.delete(r.id)
+        return next
+      })
+      loadTable()
       reload()
     } catch (e) {
       alert(e.message)
     }
   }
+
+  const applyBulkStatus = async () => {
+    try {
+      const { count } = await api.admin.bulkSetRequestStatus([...selected], bulkStatus)
+      showToast(`Статус изменён у заявок: ${count}`)
+      setSelected(new Set())
+      loadTable()
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const doExport = async (format) => {
+    setExporting(true)
+    try {
+      await api.admin.exportRequests(filters, format)
+    } catch (e) {
+      showToast(e.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const onNoteSaved = (updated) => {
+    setTable((t) => ({ ...t, items: t.items.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)) }))
+  }
+
+  const toggleRow = (id) => {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const allOnPageSelected = table.items.length > 0 && table.items.every((r) => selected.has(r.id))
+  const toggleAllOnPage = () => {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (allOnPageSelected) table.items.forEach((r) => next.delete(r.id))
+      else table.items.forEach((r) => next.add(r.id))
+      return next
+    })
+  }
+
+  const totalPages = Math.max(1, Math.ceil(table.total / table.pageSize))
+  const filtersActive = Object.entries(filters).some(([k, v]) => v !== EMPTY_FILTERS[k])
 
   return (
     <>
@@ -846,50 +1037,163 @@ function RequestsTab({ requests, reload }) {
         <div>
           <h1>Заявки</h1>
           <p className="admin-hint">
-            Входящие запросы на КП и заказы звонка. Меняйте статус по мере обработки.
+            Входящие запросы на КП и заказы звонка. Фильтруйте, ищите, меняйте статус — по одной или пачкой.
           </p>
         </div>
-        {requests.some((r) => r.aiScore != null) && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-2)' }}>
-            <input
-              type="checkbox"
-              checked={sortByScore}
-              onChange={(e) => setSortByScore(e.target.checked)}
-            />
-            Сортировать по баллу ИИ
-          </label>
-        )}
       </div>
 
       {requests.length > 0 && (
         <LeadAnalyzer requests={requests} byId={scored} setById={setScored} />
       )}
 
-      {requests.length === 0 ? (
-        <EmptyState title="Заявок пока нет" text="Здесь появятся запросы с сайта." />
+      <div className="req-filters">
+        <input
+          className="input"
+          style={{ minWidth: 200, flex: '1 1 220px' }}
+          placeholder="Поиск: имя, телефон, комментарий…"
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
+        />
+        <select className="input" value={filters.status} onChange={(e) => setFilter({ status: e.target.value })}>
+          <option value="">Любой статус</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select className="input" value={filters.type} onChange={(e) => setFilter({ type: e.target.value })}>
+          <option value="">Любой тип</option>
+          <option value="КП">КП</option>
+          <option value="Звонок">Звонок</option>
+        </select>
+        <select className="input" value={filters.modelId} onChange={(e) => setFilter({ modelId: e.target.value })}>
+          <option value="">Любая модель</option>
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <select className="input" value={filters.region} onChange={(e) => setFilter({ region: e.target.value })}>
+          <option value="">Любой регион</option>
+          {regions.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <input
+          className="input"
+          style={{ maxWidth: 140 }}
+          placeholder="Источник"
+          value={filters.source}
+          onChange={(e) => setFilter({ source: e.target.value })}
+        />
+        <input
+          type="date"
+          className="input"
+          style={{ maxWidth: 150 }}
+          value={filters.dateFrom}
+          onChange={(e) => setFilter({ dateFrom: e.target.value })}
+          title="С даты"
+        />
+        <input
+          type="date"
+          className="input"
+          style={{ maxWidth: 150 }}
+          value={filters.dateTo}
+          onChange={(e) => setFilter({ dateTo: e.target.value })}
+          title="По дату"
+        />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-2)' }}>
+          <input
+            type="checkbox"
+            checked={filters.onlyDuplicates}
+            onChange={(e) => setFilter({ onlyDuplicates: e.target.checked })}
+          />
+          только дубли
+        </label>
+        {filtersActive && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setFilters(EMPTY_FILTERS)
+              setQInput('')
+              setPage(1)
+            }}
+          >
+            Сбросить
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        <button type="button" className="btn btn-secondary btn-sm" disabled={exporting} onClick={() => doExport('csv')}>
+          Экспорт CSV
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={exporting} onClick={() => doExport('xlsx')}>
+          Экспорт XLSX
+        </button>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="req-bulkbar">
+          <span>Выбрано: {selected.size}</span>
+          <select className="input" style={{ padding: '6px 9px' }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn-primary btn-sm" onClick={applyBulkStatus}>
+            Применить статус
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>
+            Снять выбор
+          </button>
+        </div>
+      )}
+
+      {!tableLoading && table.total === 0 ? (
+        <EmptyState
+          title={filtersActive ? 'Ничего не найдено' : 'Заявок пока нет'}
+          text={filtersActive ? 'Попробуйте изменить фильтры.' : 'Здесь появятся запросы с сайта.'}
+        />
       ) : (
-        <div className="admin-panel table-scroll">
+        <div className="admin-panel table-scroll" style={{ opacity: tableLoading ? 0.6 : 1 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Дата</th>
-                <th>Тип</th>
-                <th>Балл ИИ</th>
-                <th>Имя</th>
+                <th>
+                  <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} />
+                </th>
+                {SORT_COLUMNS.map((c) => (
+                  <th key={c.key} className="th-sort" onClick={() => toggleSort(c.key)}>
+                    {c.label}
+                    {sortBy === c.key && <span> {sortDir === 'asc' ? '↑' : '↓'}</span>}
+                  </th>
+                ))}
                 <th>Телефон</th>
                 <th>Модель / регион</th>
-                <th>Статус</th>
+                <th className="th-sort" onClick={() => toggleSort('nextContactAt')}>
+                  Заметка / контакт
+                  {sortBy === 'nextContactAt' && <span> {sortDir === 'asc' ? '↑' : '↓'}</span>}
+                </th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {table.items.map((r) => (
                 <tr key={r.id} className={scored[r.id] ? `row-${prioClass(scored[r.id].priority)}` : ''}>
-                  <td data-label="Дата" style={{ whiteSpace: 'nowrap' }}>{formatDateShort(r.date)}</td>
-                  <td data-label="Тип">
-                    <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>
-                      {r.type}
-                    </span>
+                  <td>
+                    <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleRow(r.id)} />
+                  </td>
+                  <td data-label="Дата" style={{ whiteSpace: 'nowrap' }}>
+                    {formatDateShort(r.date)}
+                    <div>
+                      <span className={`tag ${r.type === 'КП' ? 'tag-brass' : 'tag-outline'}`}>{r.type}</span>
+                    </div>
                   </td>
                   <td data-label="Балл ИИ">
                     {scored[r.id] ? (
@@ -911,6 +1215,18 @@ function RequestsTab({ requests, reload }) {
                       </div>
                     )}
                   </td>
+                  <td data-label="Статус">
+                    <select
+                      className="input"
+                      style={{ minWidth: 130, padding: '7px 9px' }}
+                      value={r.status}
+                      onChange={(e) => setStatus(r, e.target.value)}
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </td>
                   <td data-label="Телефон" style={{ whiteSpace: 'nowrap' }}>
                     <a
                       href={`tel:${r.phone.replace(/\s/g, '')}`}
@@ -918,6 +1234,11 @@ function RequestsTab({ requests, reload }) {
                     >
                       {r.phone}
                     </a>
+                    {r.duplicateCount > 1 && (
+                      <div className="tag tag-danger" style={{ marginTop: 4 }} title="Этот телефон встречается в нескольких заявках">
+                        дубль ×{r.duplicateCount}
+                      </div>
+                    )}
                   </td>
                   <td data-label="Модель / регион" style={{ color: 'var(--text-2)' }}>
                     {r.meta}
@@ -932,17 +1253,8 @@ function RequestsTab({ requests, reload }) {
                       </div>
                     )}
                   </td>
-                  <td data-label="Статус">
-                    <select
-                      className="input"
-                      style={{ minWidth: 130, padding: '7px 9px' }}
-                      value={r.status}
-                      onChange={(e) => setStatus(r, e.target.value)}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
+                  <td>
+                    <NotesCell r={r} onSaved={onNoteSaved} />
                   </td>
                   <td className="card-actions">
                     <button
@@ -958,6 +1270,25 @@ function RequestsTab({ requests, reload }) {
               ))}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div className="req-pagination">
+              <button type="button" className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                ← Пред.
+              </button>
+              <span>
+                Стр. {table.page} из {totalPages} ({table.total} заявок)
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                След. →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -1316,7 +1647,7 @@ export default function Admin() {
             {tab === 'catalog' && <CatalogTab models={models} cats={cats} reload={load} />}
             {tab === 'services' && <ServicesPanel services={services} reload={load} />}
             {tab === 'news' && <NewsTab news={news} reload={load} />}
-            {tab === 'requests' && <RequestsTab requests={requests} reload={load} />}
+            {tab === 'requests' && <RequestsTab requests={requests} reload={load} models={models} />}
             {tab === 'main' && <MainTab stats={stats} certs={certs} reload={load} />}
             {tab === 'settings' && <SettingsTab onRelogin={logout} />}
           </>

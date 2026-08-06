@@ -367,6 +367,12 @@ h4 {
   border-color: var(--rule-strong);
 }
 
+.tag-danger {
+  background: #fdecea;
+  color: #a33;
+  border-color: #e8b4ae;
+}
+
 /* ---------------------- рамка с угловыми засечками ---------------------- */
 
 .frame {
@@ -1397,6 +1403,53 @@ h4 {
 
 .table-scroll {
   overflow-x: auto;
+}
+
+.th-sort {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-sort:hover {
+  color: var(--ink);
+}
+
+/* Панель фильтров над таблицей заявок: поля переносятся свободно, поиск —
+   самое широкое поле, кнопки экспорта прижаты вправо через margin-left:auto
+   на пустом growing-элементе следом. */
+.req-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.req-filters .input {
+  width: auto;
+}
+
+.req-bulkbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--brass-100);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+}
+
+.req-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0 4px;
+  font-size: 13px;
+  color: var(--text-2);
 }
 
 /* -------------------------------- новости ------------------------------- */

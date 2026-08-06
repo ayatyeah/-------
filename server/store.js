@@ -921,6 +921,82 @@ export const media = {
 
 /* -------------------------------- заявки --------------------------------- */
 
+/** Источник заявки — utm-метка, иначе домен перехода, иначе прямой заход.
+    Метки собираются на сайте, см. src/lib/attribution.js. Общая функция для
+    разрезов дашборда (задача 6) и фильтра/выгрузки заявок (задача 4). */
+const sourceOf = (r) => {
+  if (r.utmSource) return r.utmSource
+  if (r.referrer) {
+    try {
+      return new URL(r.referrer).hostname.replace(/^www\./, '')
+    } catch {
+      return 'Прямой заход'
+    }
+  }
+  return 'Прямой заход'
+}
+
+/** Телефон только цифрами — для сравнения независимо от того, как именно
+    его набрали («+7 701...» и «8(701)...» должны считаться одним номером). */
+const normPhone = (p) => (p || '').replace(/\D/g, '')
+
+/** Сколько раз каждый нормализованный телефон встречается среди ВСЕХ
+    заявок — основа для отметки и фильтра дублей (задача 4). */
+function phoneCountMap() {
+  const counts = new Map()
+  for (const r of data.requests) {
+    const key = normPhone(r.phone)
+    if (!key) continue
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  return counts
+}
+
+const REQUEST_SORT_KEYS = ['createdAt', 'date', 'fio', 'status', 'aiScore', 'nextContactAt']
+
+/** Общий фильтр + сортировка для requests.query()/exportRows() — без
+    пагинации, чтобы выгрузка могла взять весь отфильтрованный список. */
+function filteredSortedRequests(params = {}) {
+  const {
+    status, type, dateFrom, dateTo, modelId, region, source, q, onlyDuplicates,
+    sortBy = 'createdAt', sortDir = 'desc',
+  } = params
+
+  const phoneCounts = onlyDuplicates ? phoneCountMap() : null
+  const qLower = (q || '').trim().toLowerCase()
+
+  let list = data.requests.filter((r) => {
+    if (status && r.status !== status) return false
+    if (type && r.type !== type) return false
+    if (dateFrom && r.date < dateFrom) return false
+    if (dateTo && r.date > dateTo) return false
+    if (modelId && r.modelId !== modelId) return false
+    if (region && r.region !== region) return false
+    if (source && !sourceOf(r).toLowerCase().includes(source.toLowerCase())) return false
+    if (onlyDuplicates && (phoneCounts.get(normPhone(r.phone)) || 0) < 2) return false
+    if (qLower) {
+      const hay = `${r.fio} ${r.phone} ${r.comment} ${r.meta}`.toLowerCase()
+      if (!hay.includes(qLower)) return false
+    }
+    return true
+  })
+
+  const dir = sortDir === 'asc' ? 1 : -1
+  const key = REQUEST_SORT_KEYS.includes(sortBy) ? sortBy : 'createdAt'
+  list = [...list].sort((a, b) => {
+    const av = a[key]
+    const bv = b[key]
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (av < bv) return -1 * dir
+    if (av > bv) return 1 * dir
+    return 0
+  })
+
+  return list
+}
+
 export const requests = {
   all: () => clone(data.requests),
   get: (id) => {
@@ -975,6 +1051,10 @@ export const requests = {
       // 6), где строку пришлось бы разбирать обратно на части.
       modelId: modelId || '',
       region: region || '',
+      // Рабочие пометки менеджера (задача 4) — не от посетителя, заполняются
+      // только в админке.
+      notes: '',
+      nextContactAt: null,
     }
     data.requests.unshift(r)
     // Заявку — сразу на диск, не через отложенный save(): показать клиенту
@@ -1004,6 +1084,54 @@ export const requests = {
     r.resolvedAt = status === 'Обработана' ? new Date().toISOString() : null
     save()
     return clone(r)
+  },
+  /** Массовая смена статуса — для чекбоксов в таблице заявок (задача 4).
+      Возвращает, сколько заявок реально нашлось и изменилось. */
+  setBulkStatus(ids, status) {
+    const set = new Set(ids)
+    const at = new Date().toISOString()
+    let count = 0
+    for (const r of data.requests) {
+      if (!set.has(r.id)) continue
+      r.status = status
+      r.resolvedAt = status === 'Обработана' ? at : null
+      count++
+    }
+    if (count) save()
+    return count
+  },
+  /** Заметка менеджера и дата следующего контакта — оба поля необязательны
+      по отдельности, null у nextContactAt означает «снять напоминание». */
+  setNotes(id, { notes, nextContactAt }) {
+    const r = data.requests.find((x) => x.id === id)
+    if (!r) return null
+    if (notes !== undefined) r.notes = notes
+    if (nextContactAt !== undefined) r.nextContactAt = nextContactAt
+    save()
+    return clone(r)
+  },
+  /** Заявки списком: фильтры, поиск, сортировка, пагинация — «рабочее
+      место» по заявкам (задача 4). Дубли считаются по номеру телефона среди
+      ВСЕХ заявок, а не только отфильтрованных, — иначе фильтр мог бы
+      случайно спрятать вторую половину пары. */
+  query(params = {}) {
+    const list = filteredSortedRequests(params)
+    const total = list.length
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20))
+    const page = Math.max(1, Number(params.page) || 1)
+    const phoneCounts = phoneCountMap()
+    const items = list
+      .slice((page - 1) * pageSize, page * pageSize)
+      .map((r) => ({ ...clone(r), duplicateCount: phoneCounts.get(normPhone(r.phone)) || 0 }))
+    return { items, total, page, pageSize }
+  },
+  /** То же самое без пагинации — для выгрузки в CSV/XLSX. Потолок в 5000
+      строк защищает процесс от случайной выгрузки без единого фильтра на
+      очень большой базе; для реального размера этого бизнеса — с запасом. */
+  exportRows(params = {}) {
+    const list = filteredSortedRequests(params).slice(0, 5000)
+    const phoneCounts = phoneCountMap()
+    return list.map((r) => ({ ...clone(r), duplicateCount: phoneCounts.get(normPhone(r.phone)) || 0 }))
   },
   /** Записывает вердикты ИИ-анализатора лидов (см. server/ai.js
       analyzeLeads) прямо в заявки — оценка переживает перезагрузку страницы
@@ -1136,17 +1264,6 @@ export const dashboard = {
 
     // Разрез по источникам — utm-метка, иначе домен перехода, иначе прямой
     // заход. Метки собираются на сайте, см. src/lib/attribution.js.
-    const sourceOf = (r) => {
-      if (r.utmSource) return r.utmSource
-      if (r.referrer) {
-        try {
-          return new URL(r.referrer).hostname.replace(/^www\./, '')
-        } catch {
-          return 'Прямой заход'
-        }
-      }
-      return 'Прямой заход'
-    }
     const sourceCounts = new Map()
     for (const r of inMonth) {
       const key = sourceOf(r)

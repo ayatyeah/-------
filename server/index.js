@@ -24,6 +24,7 @@ import { renderPage } from './seo.js'
 import * as uploads from './uploads.js'
 import { notifyNewRequest, notifyText } from './notify.js'
 import { PRIVACY_VERSION } from '../shared/constants.js'
+import ExcelJS from 'exceljs'
 
 const { seeded, recovered } = store.load()
 
@@ -858,6 +859,131 @@ app.delete('/api/requests/:id', requireAdmin, limitAdminWrite, wrap((req, res) =
     return res.status(404).json({ error: 'Заявка не найдена' })
   }
   res.json({ ok: true })
+}))
+
+/* ---------------------- заявки: рабочее место (задача 4) ----------------- */
+
+/** Общие для списка и выгрузки параметры фильтра — из query-строки в чистый
+    объект. Здесь же обрезка длины: значения идут прямиком в фильтр по
+    строкам, а не в HTML или SQL, так что опасность не инъекция, а просто
+    отказ, если кто-то пришлёт мегабайт в одном параметре. */
+function parseRequestFilters(q) {
+  const STATUSES = ['Новая', 'В работе', 'Обработана']
+  const TYPES = ['КП', 'Звонок']
+  return {
+    status: STATUSES.includes(q.status) ? q.status : '',
+    type: TYPES.includes(q.type) ? q.type : '',
+    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(q.dateFrom || '') ? q.dateFrom : '',
+    dateTo: /^\d{4}-\d{2}-\d{2}$/.test(q.dateTo || '') ? q.dateTo : '',
+    modelId: clean(q.modelId, 40),
+    region: clean(q.region, 60),
+    source: clean(q.source, 60),
+    q: clean(q.q, 100),
+    onlyDuplicates: q.onlyDuplicates === '1' || q.onlyDuplicates === 'true',
+    sortBy: clean(q.sortBy, 20),
+    sortDir: q.sortDir === 'asc' ? 'asc' : 'desc',
+  }
+}
+
+app.get('/api/admin/requests', requireAdmin, wrap((req, res) => {
+  const filters = parseRequestFilters(req.query)
+  res.json(
+    store.requests.query({
+      ...filters,
+      page: Number(req.query.page) || 1,
+      pageSize: Number(req.query.pageSize) || 20,
+    })
+  )
+}))
+
+app.get('/api/admin/requests/export', requireAdmin, wrap(async (req, res) => {
+  const filters = parseRequestFilters(req.query)
+  const rows = store.requests.exportRows(filters)
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+
+  const cols = [
+    { header: 'Дата', key: 'date', width: 12 },
+    { header: 'Тип', key: 'type', width: 10 },
+    { header: 'Статус', key: 'status', width: 12 },
+    { header: 'Имя', key: 'fio', width: 22 },
+    { header: 'Телефон', key: 'phone', width: 16 },
+    { header: 'Модель / регион', key: 'meta', width: 30 },
+    { header: 'Комментарий', key: 'comment', width: 30 },
+    { header: 'Источник', key: 'source', width: 16 },
+    { header: 'Балл ИИ', key: 'aiScore', width: 10 },
+    { header: 'Заметка', key: 'notes', width: 30 },
+    { header: 'Следующий контакт', key: 'nextContactAt', width: 16 },
+    { header: 'Повтор по телефону', key: 'duplicateCount', width: 10 },
+  ]
+  const dataRows = rows.map((r) => ({
+    date: r.date,
+    type: r.type,
+    status: r.status,
+    fio: r.fio,
+    phone: r.phone,
+    meta: r.meta,
+    comment: r.comment,
+    source: r.utmSource || r.referrer || '',
+    aiScore: r.aiScore ?? '',
+    notes: r.notes || '',
+    nextContactAt: r.nextContactAt || '',
+    duplicateCount: r.duplicateCount > 1 ? r.duplicateCount : '',
+  }))
+
+  if (req.query.format === 'xlsx') {
+    const wb = new ExcelJS.Workbook()
+    const sheet = wb.addWorksheet('Заявки')
+    sheet.columns = cols
+    sheet.getRow(1).font = { bold: true }
+    sheet.addRows(dataRows)
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    res.setHeader('Content-Disposition', `attachment; filename="shmagro-requests-${stamp}.xlsx"`)
+    await wb.xlsx.write(res)
+    return res.end()
+  }
+
+  // CSV по умолчанию — без сторонней библиотеки, с BOM для Excel на
+  // кириллице и экранированием запятых/кавычек/переносов строк.
+  const esc = (v) => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv =
+    '﻿' +
+    [cols.map((c) => esc(c.header)).join(','), ...dataRows.map((r) => cols.map((c) => esc(r[c.key])).join(','))].join(
+      '\n'
+    )
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="shmagro-requests-${stamp}.csv"`)
+  res.send(csv)
+}))
+
+app.patch('/api/admin/requests/:id/notes', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const body = {}
+  if (req.body?.notes !== undefined) body.notes = clean(req.body.notes, 2000)
+  if (req.body?.nextContactAt !== undefined) {
+    const v = req.body.nextContactAt
+    body.nextContactAt = v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null
+  }
+  if (!('notes' in body) && !('nextContactAt' in body)) {
+    return res.status(400).json({ error: 'Нечего сохранять' })
+  }
+  const r = store.requests.setNotes(req.params.id, body)
+  if (!r) return res.status(404).json({ error: 'Заявка не найдена' })
+  res.json(r)
+}))
+
+app.post('/api/admin/requests/bulk-status', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const allowed = ['Новая', 'В работе', 'Обработана']
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((x) => typeof x === 'string').slice(0, 200) : []
+  if (!ids.length || !allowed.includes(req.body?.status)) {
+    return res.status(400).json({ error: 'Нужны id заявок и допустимый статус' })
+  }
+  const count = store.requests.setBulkStatus(ids, req.body.status)
+  res.json({ ok: true, count })
 }))
 
 /* ------------------------------- настройки ----------------------------- */

@@ -109,6 +109,38 @@ export const api = {
       request(`/requests/${id}`, { method: 'PATCH', body: { status }, auth: true }),
     deleteRequest: (id) => request(`/requests/${id}`, { method: 'DELETE', auth: true }),
 
+    /** «Рабочее место» по заявкам: фильтры, поиск, сортировка, страницы. */
+    requestsQuery: (params) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== '' && v !== undefined && v !== false)
+      )
+      return request(`/admin/requests?${qs}`, { auth: true })
+    },
+    setRequestNotes: (id, body) =>
+      request(`/admin/requests/${id}/notes`, { method: 'PATCH', body, auth: true }),
+    bulkSetRequestStatus: (ids, status) =>
+      request('/admin/requests/bulk-status', { method: 'POST', body: { ids, status }, auth: true }),
+
+    /** Выгрузка заявок в CSV/XLSX с текущими фильтрами. */
+    async exportRequests(params, format) {
+      const qs = new URLSearchParams(
+        Object.entries({ ...params, format }).filter(([, v]) => v !== '' && v !== undefined && v !== false)
+      )
+      const res = await fetch(`/api/admin/requests/export?${qs}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
+      if (!res.ok) throw new Error('Не удалось выгрузить заявки')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `shmagro-requests-${new Date().toISOString().slice(0, 10)}.${format === 'xlsx' ? 'xlsx' : 'csv'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+
     saveSettings: (body) => request('/settings', { method: 'PUT', body, auth: true }),
 
     /** Смена пароля админки. Текущий спрашиваем даже у вошедшего. */
