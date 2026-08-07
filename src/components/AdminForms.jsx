@@ -38,47 +38,59 @@ function SpecsEditor({ specs, onChange, template = [] }) {
       <label>Технические характеристики</label>
 
       {specs.map((s, i) => (
-        <div key={i} className="spec-row">
-          <div className="spec-move">
+        <div key={i} className="spec-row-wrap">
+          <div className="spec-row">
+            <div className="spec-move">
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                aria-label="Выше"
+                title="Поднять"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === specs.length - 1}
+                aria-label="Ниже"
+                title="Опустить"
+              >
+                ↓
+              </button>
+            </div>
+            <input
+              className="input"
+              placeholder="Параметр"
+              value={s.k}
+              onChange={(e) => set(i, 'k', e.target.value)}
+            />
+            <input
+              className="input spec-val"
+              placeholder="Значение"
+              value={s.v}
+              onChange={(e) => set(i, 'v', e.target.value)}
+            />
             <button
               type="button"
-              onClick={() => move(i, -1)}
-              disabled={i === 0}
-              aria-label="Выше"
-              title="Поднять"
+              className="btn btn-secondary btn-sm"
+              aria-label="Удалить строку"
+              onClick={() => onChange(specs.filter((_, idx) => idx !== i))}
             >
-              ↑
-            </button>
-            <button
-              type="button"
-              onClick={() => move(i, 1)}
-              disabled={i === specs.length - 1}
-              aria-label="Ниже"
-              title="Опустить"
-            >
-              ↓
+              ✕
             </button>
           </div>
+          {/* Необязательная подпись «через выгоду» под характеристикой —
+              задача 10 дорожной карты. Ничего не подставляем сами: цифры
+              вроде «12 м ≈ 100 га за смену» должен посчитать и вписать тот,
+              кто знает реальную производительность модели. */}
           <input
-            className="input"
-            placeholder="Параметр"
-            value={s.k}
-            onChange={(e) => set(i, 'k', e.target.value)}
+            className="input spec-benefit"
+            placeholder="Выгода для клиента — необязательно, например «на треть быстрее однопроходной сеялки»"
+            value={s.benefit || ''}
+            onChange={(e) => set(i, 'benefit', e.target.value)}
           />
-          <input
-            className="input spec-val"
-            placeholder="Значение"
-            value={s.v}
-            onChange={(e) => set(i, 'v', e.target.value)}
-          />
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            aria-label="Удалить строку"
-            onClick={() => onChange(specs.filter((_, idx) => idx !== i))}
-          >
-            ✕
-          </button>
         </div>
       ))}
 
@@ -117,12 +129,16 @@ export function ModelForm({ model, cats, onSave, onClose }) {
     descr: model?.descr ?? '',
     subsidized: model?.subsidized ?? false,
     published: model?.published ?? true,
+    badge: model?.badge ?? '',
+    flagship: model?.flagship ?? false,
+    testimonial: model?.testimonial ?? { quote: '', author: '' },
   })
   const [specs, setSpecs] = useState(model?.specs ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  const updTestimonial = (k, v) => setF((p) => ({ ...p, testimonial: { ...p.testimonial, [k]: v } }))
 
   async function submit(e) {
     e.preventDefault()
@@ -206,7 +222,7 @@ export function ModelForm({ model, cats, onSave, onClose }) {
           template={cats.find((c) => c.id === f.cat)?.specTemplate ?? []}
         />
 
-        <div style={{ display: 'flex', gap: 22, marginTop: 6 }}>
+        <div style={{ display: 'flex', gap: 22, marginTop: 6, flexWrap: 'wrap' }}>
           <label className="check">
             <input
               type="checkbox"
@@ -223,7 +239,53 @@ export function ModelForm({ model, cats, onSave, onClose }) {
             />
             Опубликовано
           </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={f.flagship}
+              onChange={(e) => upd('flagship', e.target.checked)}
+            />
+            Флагман модельного ряда
+          </label>
         </div>
+
+        <div className="field">
+          <label htmlFor="m_badge">Бейдж на карточке</label>
+          <select id="m_badge" className="input" value={f.badge} onChange={(e) => upd('badge', e.target.value)}>
+            <option value="">Без бейджа</option>
+            <option value="new">Новинка</option>
+            <option value="hit">Хит сезона</option>
+            <option value="in_stock">В наличии</option>
+            <option value="on_order">Под заказ</option>
+          </select>
+        </div>
+
+        {/* Отзыв хозяйства — необязателен и пуст по умолчанию: показываем на
+            странице модели, только когда оба поля реально заполнены. Никакой
+            заготовки текста здесь нет намеренно — выдумывать отзыв за
+            заказчика недопустимо. */}
+        <div className="field">
+          <label htmlFor="m_testimonial_quote">Отзыв хозяйства (необязательно)</label>
+          <textarea
+            id="m_testimonial_quote"
+            className="input"
+            value={f.testimonial.quote}
+            onChange={(e) => updTestimonial('quote', e.target.value)}
+            placeholder="Текст реального отзыва — если его пока нет, оставьте пустым"
+          />
+        </div>
+        {f.testimonial.quote && (
+          <div className="field">
+            <label htmlFor="m_testimonial_author">Автор отзыва</label>
+            <input
+              id="m_testimonial_author"
+              className="input"
+              value={f.testimonial.author}
+              onChange={(e) => updTestimonial('author', e.target.value)}
+              placeholder="Например: КХ «Алтын дала», Акмолинская обл."
+            />
+          </div>
+        )}
 
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>

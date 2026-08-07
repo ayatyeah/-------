@@ -160,12 +160,26 @@ export function slugify(sourceName, prefix = 'c') {
   return base || newId(prefix)
 }
 
-/** Строка характеристик: {k, v}. Пустые строки вызывающий отбрасывает сам. */
+/** Строка характеристик: {k, v, benefit}. benefit — необязательная подпись
+    «через выгоду» под значением (задача 10), например «захват 12 м — на
+    треть быстрее однопроходной сеялки». Пустые строки вызывающий
+    отбрасывает сам. */
 const cleanSpecs = (list) =>
   (Array.isArray(list) ? list : [])
     .slice(0, MAX.specs)
-    .map((s) => ({ k: str(s?.k, MAX.specKey), v: str(s?.v, MAX.specVal) }))
+    .map((s) => ({ k: str(s?.k, MAX.specKey), v: str(s?.v, MAX.specVal), benefit: str(s?.benefit, MAX.specVal) }))
     .filter((s) => s.k || s.v)
+
+const BADGES = ['', 'new', 'hit', 'in_stock', 'on_order']
+const cleanBadge = (v) => (BADGES.includes(v) ? v : '')
+
+/** Отзыв хозяйства под моделью (задача 10) — необязателен, оба поля пустые
+    по умолчанию: выдумывать отзыв за заказчика недопустимо, это должен
+    заполнить он сам, когда появится реальный. */
+const cleanTestimonial = (t) => ({
+  quote: str(t?.quote, MAX.text),
+  author: str(t?.author, MAX.note),
+})
 
 /** Дополнительные фото модели, сверх главного. Каждый путь проходит ту же
     проверку, что и главное фото; мусор и дубли отбрасываем молча. */
@@ -645,6 +659,11 @@ export const models = {
       subsidized: !!body.subsidized,
       published: body.published !== false,
       sort: nextSort(data.models),
+      // Витрина карточки модели (задача 10) — все поля необязательны и по
+      // умолчанию пустые/выключены, ничего не подставляется автоматически.
+      badge: cleanBadge(body.badge),
+      flagship: !!body.flagship,
+      testimonial: cleanTestimonial(body.testimonial),
     }
     data.models.push(m)
     save()
@@ -663,6 +682,9 @@ export const models = {
     if (body.subsidized !== undefined) m.subsidized = !!body.subsidized
     if (body.published !== undefined) m.published = !!body.published
     if (body.sort !== undefined) m.sort = num(body.sort, m.sort, 0, 100000)
+    if (body.badge !== undefined) m.badge = cleanBadge(body.badge)
+    if (body.flagship !== undefined) m.flagship = !!body.flagship
+    if (body.testimonial !== undefined) m.testimonial = cleanTestimonial(body.testimonial)
     save()
     return withCat(m)
   },
@@ -1397,6 +1419,15 @@ const SETTING_KEYS = [
      Пустая — на «Контактах» показывается адрес текстом и ссылка «Открыть
      в картах», без встраивания. */
   'map_embed_url',
+  // Персональный менеджер и сезонный баннер на карточке модели (задача 10).
+  'manager_name',
+  'manager_phone',
+  'manager_photo',
+  /* Строковый флаг, а не булево: все настройки в этом хранилище — строки,
+     проверенные str() (см. ниже), а str(true, …) вернул бы '' и стёр бы
+     сам флаг. '1' — включено, '' — выключено. */
+  'season_banner_enabled',
+  'season_banner_text',
 ]
 const URL_KEYS = new Set([
   'leasing_url', 'subsidy_url', 'instagram_url', 'telegram_url', 'whatsapp_url',
@@ -1405,7 +1436,7 @@ const URL_KEYS = new Set([
 /* Фото на главной и на странице «О компании» — не ссылка, а путь к своей
    картинке (/assets/… из комплекта или /uploads/… из библиотеки), поэтому
    проверяются той же safeMedia(), что и фото модели, а не safeUrl(). */
-const MEDIA_KEYS = new Set(['hero_photo', 'about_photo'])
+const MEDIA_KEYS = new Set(['hero_photo', 'about_photo', 'manager_photo'])
 
 /** Ссылку принимаем только пустую или явный https:// — прочее (в т.ч.
     javascript:, data:, http://) отбрасываем в пустую строку. */

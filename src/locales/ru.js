@@ -171,6 +171,16 @@ export default {
     subsidy_check: 'проверить на ГосАгро →',
     model_kp: 'Получить коммерческое предложение',
     specs_title: 'Технические характеристики',
+    flagship: 'Флагман модельного ряда',
+    badge_new: 'Новинка',
+    badge_hit: 'Хит сезона',
+    badge_in_stock: 'В наличии',
+    badge_on_order: 'Под заказ',
+    testimonial_title: 'Отзыв хозяйства',
+    manager_title: 'Личный менеджер по этой модели',
+    manager_visit: 'Запросить выезд в хозяйство',
+    manager_demo: 'Записаться на демо-показ',
+    related_title: 'Похожие модели',
 
     // Контакты
     contacts_kicker: 'Связаться',

@@ -5,6 +5,7 @@ import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
 import CatalogImportPanel from '../components/AdminCatalogImport'
+import MediaPicker from '../components/MediaPicker'
 import {
   CategoriesPanel,
   ServicesPanel,
@@ -265,12 +266,12 @@ function DashboardSection({ summary, onMonthChange }) {
 
         <div className="admin-panel dash-chart-card">
           <h4>Просмотры карточек моделей</h4>
-          <BarList items={dash.modelViews.map((m) => ({ label: m.name, value: m.count }))} color="var(--brass-500)" />
+          <BarList items={dash.modelViews.map((m) => ({ id: m.id, label: m.name, value: m.count }))} color="var(--brass-500)" />
         </div>
 
         <div className="admin-panel dash-chart-card">
           <h4>По моделям (запросы КП)</h4>
-          <BarList items={dash.byModel.map((m) => ({ label: m.name, value: m.count }))} color="var(--green-600)" />
+          <BarList items={dash.byModel.map((m) => ({ id: m.id, label: m.name, value: m.count }))} color="var(--green-600)" />
         </div>
 
         <div className="admin-panel dash-chart-card">
@@ -1349,6 +1350,9 @@ const SETTINGS_FIELD_LABELS = {
   hero_title: 'Заголовок героя',
   hero_subtitle: 'Подзаголовок',
   map_embed_url: 'Карта на «Контактах»',
+  manager_name: 'Имя менеджера',
+  manager_phone: 'Телефон менеджера',
+  season_banner_text: 'Текст баннера',
 }
 
 function SettingsTab({ onRelogin }) {
@@ -1499,6 +1503,37 @@ function SettingsTab({ onRelogin }) {
           {field('hero_title', 'Заголовок героя')}
           {field('hero_subtitle', 'Подзаголовок', 'textarea')}
           {saveButton('hero', ['hero_title', 'hero_subtitle'], 'Тексты главной')}
+        </div>
+
+        <div className="admin-settings-panel">
+          <h3>Персональный менеджер</h3>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Показывается на странице модели как «выезд в хозяйство» / «демо-показ» —
+            блок появляется, только когда указаны имя и телефон. Пустое поле —
+            блока просто нет, ничего выдуманного на сайт не попадёт.
+          </p>
+          {field('manager_name', 'Имя и должность', 'input', 'Айдос, менеджер по продажам')}
+          {field('manager_phone', 'Телефон', 'input', '+7 700 123 45 67')}
+          <MediaPicker value={f.manager_photo} onChange={(v) => upd('manager_photo', v)} label="Фото менеджера" />
+          {saveButton('manager', ['manager_name', 'manager_phone', 'manager_photo'], 'Менеджер')}
+        </div>
+
+        <div className="admin-settings-panel">
+          <h3>Сезонный баннер</h3>
+          <p className="admin-hint" style={{ marginBottom: 12 }}>
+            Строка над каталогом и карточкой модели на время посевной/уборочной —
+            включайте и выключайте вручную по сезону.
+          </p>
+          <label className="check" style={{ marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={f.season_banner_enabled === '1'}
+              onChange={(e) => upd('season_banner_enabled', e.target.checked ? '1' : '')}
+            />
+            Баннер включён
+          </label>
+          {field('season_banner_text', 'Текст баннера', 'input', 'Успейте до посевной — техника в наличии')}
+          {saveButton('season', ['season_banner_enabled', 'season_banner_text'], 'Сезонный баннер')}
         </div>
       </div>
 

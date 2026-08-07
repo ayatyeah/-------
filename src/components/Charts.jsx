@@ -98,17 +98,21 @@ export function StackedBarChart({ rows, keys, colors, labels, height = 140 }) {
   )
 }
 
-/** Горизонтальные полосы-рейтинг. items: [{ label, value }], отсортированы
+/** Горизонтальные полосы-рейтинг. items: [{ id?, label, value }], отсортированы
     заранее вызывающей стороной — компонент только рисует. Для разрезов
     дашборда по моделям/регионам/источникам: списком нагляднее, чем ещё
-    одним кольцом или столбцами — читается сверху вниз, как рейтинг. */
+    одним кольцом или столбцами — читается сверху вниз, как рейтинг.
+
+    Ключ строки — id, если он есть, а не label: у моделей название при
+    удалении схлопывается в общее «Модель удалена», и два таких пункта с
+    ключом по названию React считал бы одной и той же строкой. */
 export function BarList({ items, color = 'var(--brass-500)' }) {
   const max = Math.max(1, ...items.map((i) => i.value))
   if (!items.length) return <p className="chart-empty">Пока нет данных за этот месяц.</p>
   return (
     <ul className="bar-list">
       {items.map((i) => (
-        <li key={i.label}>
+        <li key={i.id ?? i.label}>
           <span className="bar-list-label" title={i.label}>
             {i.label}
           </span>

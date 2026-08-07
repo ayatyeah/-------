@@ -92,7 +92,13 @@ function KPDialog() {
         </div>
         <div className="field">
           <label htmlFor="k_comment">{t('f_comment')}</label>
-          <textarea id="k_comment" className="input" name="k_comment" placeholder={t('f_comment_ph')} />
+          <textarea
+            id="k_comment"
+            className="input"
+            name="k_comment"
+            placeholder={t('f_comment_ph')}
+            defaultValue={modal.presetComment || ''}
+          />
         </div>
         <ConsentCheck id="k_consent" checked={consent} onChange={setConsent} />
         <div className="dialog-actions">

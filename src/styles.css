@@ -866,11 +866,21 @@ h4 {
   padding: 0 12px;
 }
 
-.card-media .tag {
+.card-media-tags,
+.model-hero-tags {
   position: absolute;
   top: 12px;
   left: 12px;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tag-flagship {
+  background: var(--green-800);
+  color: var(--on-dark, #fff);
 }
 
 .card-body {
@@ -1225,6 +1235,17 @@ h4 {
   border-bottom: 1px solid var(--rule);
 }
 
+.season-banner {
+  background: var(--brass-300);
+  color: var(--green-900);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 10px 0;
+}
+
 /* ------------------------------ карточка модели ------------------------- */
 
 .model-layout {
@@ -1377,6 +1398,86 @@ h4 {
   padding-bottom: 12px;
   border-bottom: 2px solid var(--ink);
   margin-bottom: 4px;
+}
+
+.spec-benefit-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.testimonial {
+  margin: 28px 0;
+  padding: 20px 22px;
+  border-left: 3px solid var(--brass-400, var(--brass-300));
+  background: var(--surface);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+.testimonial p {
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.testimonial cite {
+  display: block;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.manager-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 16px;
+  align-items: center;
+  padding: 18px 20px;
+  margin: 28px 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.manager-photo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  grid-row: span 1;
+}
+
+.manager-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.manager-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.manager-phone {
+  font-size: 14px;
+  color: var(--green-700);
+}
+
+.manager-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.model-related {
+  margin-top: 56px;
+  padding-top: 8px;
 }
 
 /* -------------------------------- таблицы ------------------------------- */
@@ -5073,10 +5174,14 @@ select.input {
 
 /* --- строки с перестановкой (характеристики, показатели, документы) ------ */
 
+.spec-row-wrap {
+  margin-bottom: 10px;
+}
+
 .spec-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   align-items: center;
 }
 
@@ -5087,6 +5192,13 @@ select.input {
 
 .spec-row .spec-val {
   max-width: 190px;
+}
+
+.spec-benefit {
+  font-size: 13px;
+  padding: 7px 10px;
+  margin-left: 46px;
+  width: calc(100% - 46px);
 }
 
 /* --- сертификаты: название/область + приложенный файл --------------------*/

@@ -5,6 +5,8 @@ import { useFetch, useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media, ErrorState } from '../components/ui'
 import PhotoLightbox from '../components/PhotoLightbox'
+import ModelCard, { BADGE_TAGS } from '../components/ModelCard'
+import SeasonBanner from '../components/SeasonBanner'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
@@ -28,6 +30,12 @@ export default function ModelPage() {
   const { t, td } = useT()
   const tiltRef = useTilt(7)
   const { data: m, loading, error, reload } = useFetch(() => api.model(id), [id])
+
+  // Похожие модели — та же категория, без текущей (задача 10). Ждём, пока
+  // подгрузится сама модель: до этого категория не известна.
+  const { data: sameCat } = useFetch(() => (m ? api.models(m.cat) : Promise.resolve([])), [m?.cat, m?.id])
+  const related = (sameCat || []).filter((x) => x.id !== id).slice(0, 3)
+  const toModel = (relId) => `/catalog/${relId}${m ? `?cat=${m.cat}` : ''}`
 
   // Какое фото сейчас крупно: по умолчанию главное, миниатюра меняет его
   // без перехода на другую страницу. Сбрасываем на главное при смене
@@ -87,8 +95,12 @@ export default function ModelPage() {
     )
   }
 
+  const badge = BADGE_TAGS[m.badge]
+
   return (
     <main className="wrap route-fade" style={{ paddingBlock: '36px 72px' }}>
+      <SeasonBanner />
+
       <button type="button" className="back-link" onClick={backToCatalog}>
         {t('back_catalog')}
       </button>
@@ -104,6 +116,12 @@ export default function ModelPage() {
               disabled={!active}
             >
               <figure className="model-hero tilt" ref={tiltRef}>
+                {(m.flagship || badge) && (
+                  <span className="model-hero-tags">
+                    {m.flagship && <span className="tag tag-flagship">{t('flagship')}</span>}
+                    {badge && <span className={`tag ${badge.cls}`}>{t(badge.key)}</span>}
+                  </span>
+                )}
                 <Media src={active} alt={m.name} stub={`${m.name} · ${t('photo')}`} priority />
                 {active && (
                   <span className="model-hero-zoom-hint" aria-hidden="true">
@@ -182,15 +200,75 @@ export default function ModelPage() {
                   {m.specs.map((row, i) => (
                     <tr key={i}>
                       <td>{td(row.k)}</td>
-                      <td>{row.v}</td>
+                      <td>
+                        {row.v}
+                        {/* Характеристика «через выгоду» (задача 10) — только
+                            если админ реально вписал пояснение, ничего не
+                            считаем и не досочиняем сами. */}
+                        {row.benefit && <div className="spec-benefit-note">{row.benefit}</div>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </>
           )}
+
+          {/* Отзыв хозяйства — блок появляется только когда реально
+              заполнен в админке. */}
+          {m.testimonial?.quote && (
+            <blockquote className="testimonial">
+              <p>&laquo;{m.testimonial.quote}&raquo;</p>
+              {m.testimonial.author && <cite>{m.testimonial.author}</cite>}
+            </blockquote>
+          )}
+
+          {/* Консультативные CTA с персональным менеджером — блок целиком
+              скрыт, пока в настройках не указаны имя и телефон: ничего
+              выдуманного вместо реального сотрудника показывать нельзя. */}
+          {settings.manager_name && settings.manager_phone && (
+            <div className="manager-card">
+              {settings.manager_photo && (
+                <img src={settings.manager_photo} alt="" className="manager-photo" />
+              )}
+              <div>
+                <div className="manager-title">{t('manager_title')}</div>
+                <div className="manager-name">{settings.manager_name}</div>
+                <a className="manager-phone" href={`tel:${settings.manager_phone.replace(/[^\d+]/g, '')}`}>
+                  {settings.manager_phone}
+                </a>
+              </div>
+              <div className="manager-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => openKP(m, `Запрос: выезд в хозяйство (${m.name})`)}
+                >
+                  {t('manager_visit')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => openKP(m, `Запрос: демо-показ (${m.name})`)}
+                >
+                  {t('manager_demo')}
+                </button>
+              </div>
+            </div>
+          )}
         </Reveal>
       </div>
+
+      {related.length > 0 && (
+        <div className="model-related">
+          <h3 className="specs-title">{t('related_title')}</h3>
+          <div className="grid-2">
+            {related.map((rm, i) => (
+              <ModelCard key={rm.id} model={rm} href={toModel(rm.id)} delay={i * 90} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {lightbox && (
         <PhotoLightbox

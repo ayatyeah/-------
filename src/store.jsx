@@ -49,8 +49,16 @@ export function SiteProvider({ children }) {
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
-  const openKP = useCallback((model) => {
-    setModal({ kind: 'kp', modelId: model?.id ?? null, modelName: model?.name ?? '' })
+  // presetComment — для консультативных CTA на странице модели («выезд в
+  // хозяйство», «демо-показ»): подставляет запрос в поле комментария,
+  // ничего нового на сервере под это заводить не пришлось.
+  const openKP = useCallback((model, presetComment) => {
+    setModal({
+      kind: 'kp',
+      modelId: model?.id ?? null,
+      modelName: model?.name ?? '',
+      presetComment: presetComment || '',
+    })
   }, [])
 
   const openCall = useCallback(() => setModal({ kind: 'call' }), [])
