@@ -135,6 +135,16 @@ export default function ModelPage() {
               ))}
             </div>
           )}
+
+          {/* То же краткое описание, что и на карточке в каталоге. Колонка с
+              фото короче колонки с характеристиками (grid align-items: start
+              не тянет её по высоте) — без этого под миниатюрами оставалась
+              пустая плашка. */}
+          {m.short && (
+            <Reveal delay={120}>
+              <p className="model-left-desc">{m.short}</p>
+            </Reveal>
+          )}
         </div>
 
         <Reveal variant="right" delay={100}>
