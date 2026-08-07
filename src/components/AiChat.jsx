@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
+import { useSite } from '../store'
 import Icon from './Icon'
 import { useT } from '../i18n'
 
@@ -14,13 +15,26 @@ import { useT } from '../i18n'
 
 const SUGGESTION_KEYS = ['ai_sugg_1', 'ai_sugg_2', 'ai_sugg_3', 'ai_sugg_4']
 
+/* Переписка переживает обновление страницы (не новую вкладку — ровно то же,
+   что и у флагов визита/открытия чата в App.jsx, см. sessionStorage там). */
+const HISTORY_KEY = 'shm_ai_chat_history'
+
 export default function AiChat() {
   const { t, lang } = useT()
+  const { openCall } = useSite()
   const [open, setOpen] = useState(false)
-  /* Приветствие кладём при первом рендере на текущем языке. Уже начатую
-     переписку при смене языка не переписываем — реплики пользователя и ИИ
-     пришли на том языке, на котором их писали. */
-  const [messages, setMessages] = useState(() => [{ role: 'assistant', text: t('ai_greeting') }])
+  /* Приветствие кладём при первом рендере на текущем языке, если сохранённой
+     переписки нет. Уже начатую переписку при смене языка не переписываем —
+     реплики пользователя и ИИ пришли на том языке, на котором их писали. */
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(HISTORY_KEY) || 'null')
+      if (Array.isArray(saved) && saved.length) return saved
+    } catch {
+      /* битые данные в sessionStorage — начинаем разговор заново */
+    }
+    return [{ role: 'assistant', text: t('ai_greeting') }]
+  })
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [engine, setEngine] = useState(null)
@@ -39,6 +53,14 @@ export default function AiChat() {
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [messages, busy, open])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(HISTORY_KEY, JSON.stringify(messages))
+    } catch {
+      /* переполнено или недоступно — переписка просто не переживёт обновление */
+    }
+  }, [messages])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
@@ -164,6 +186,19 @@ export default function AiChat() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Всегда доступная альтернатива переписке: не все хотят печатать
+              вопрос по пунктам, кому-то проще, чтобы просто перезвонили. */}
+          <div className="ai-leave-number">
+            <button
+              type="button"
+              className="ai-leave-number-btn"
+              onClick={() => openCall('Заявка из AI-чата')}
+            >
+              <Icon name="phone" size={14} />
+              {t('ai_leave_number')}
+            </button>
           </div>
 
           <form

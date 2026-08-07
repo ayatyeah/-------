@@ -116,7 +116,7 @@ function KPDialog() {
 
 /** Заказ обратного звонка. */
 function CallDialog() {
-  const { closeModal, showToast } = useSite()
+  const { modal, closeModal, showToast } = useSite()
   const { t } = useT()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -136,6 +136,7 @@ function CallDialog() {
         type: 'Звонок',
         fio: f.cb_name.value.trim(),
         phone: f.cb_phone.value.trim(),
+        meta: modal.meta || undefined,
         website: f.cb_website.value,
         consent: true,
         ...getAttribution(),

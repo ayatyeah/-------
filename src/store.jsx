@@ -61,7 +61,10 @@ export function SiteProvider({ children }) {
     })
   }, [])
 
-  const openCall = useCallback(() => setModal({ kind: 'call' }), [])
+  // meta — так же, как presetComment у openKP: пометка источника заявки
+  // (например, «Заявка из AI-чата»), которая просто попадает в поле meta
+  // при отправке — см. CallDialog в Modals.jsx.
+  const openCall = useCallback((meta) => setModal({ kind: 'call', meta: meta || '' }), [])
   const closeModal = useCallback(() => setModal(null), [])
 
   const value = {

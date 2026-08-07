@@ -245,6 +245,7 @@ export default {
     ai_send_aria: 'Send',
     ai_note: 'Answered by AI — do not enter personal data. ',
     ai_more: 'Details',
+    ai_leave_number: 'Leave your number — we\'ll call back',
 
     footer_tagline: 'Manufacturing and sales of farm machinery.',
     footer_sections: 'Sections',

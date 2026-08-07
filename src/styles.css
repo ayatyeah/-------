@@ -3656,6 +3656,33 @@ select.input {
   flex: none;
 }
 
+/* Всегда доступная альтернатива переписке — заказ обратного звонка прямо
+   из чата, без необходимости печатать вопрос. */
+.ai-leave-number {
+  flex: none;
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+  text-align: center;
+}
+
+.ai-leave-number-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--green-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-leave-number-btn:hover {
+  color: var(--green-700);
+}
+
 /* Предупреждение, что переписку читает сторонний ИИ-сервис. Тихое, но
    постоянно на виду: человек должен знать это до того, как напишет. */
 .ai-note {
