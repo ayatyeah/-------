@@ -264,6 +264,11 @@ function freshData() {
        а здесь — только те центры, чей адрес и телефон реально заполнил
        заказчик. Список пуст — раздел на «Контактах» просто не показывается. */
     serviceCenters: [],
+    /* Персональные менеджеры — раньше был один на весь сайт (поля
+       manager_* в настройках), теперь список: у каждой модели в каталоге
+       можно выбрать своего. Пусто по умолчанию — блок на странице модели
+       не показывается, пока менеджер не назначен. */
+    managers: [],
   }
 }
 
@@ -415,6 +420,31 @@ function migrate(raw) {
     id: String(s.id ?? 'sc' + (i + 1)),
     sort: s.sort ?? i + 1,
   }))
+  d.managers = (Array.isArray(d.managers) ? d.managers : []).map((m, i) => ({
+    ...m,
+    id: String(m.id ?? 'mgr' + (i + 1)),
+    position: m.position || '',
+    photo: m.photo || '',
+    sort: m.sort ?? i + 1,
+  }))
+  // Единственный менеджер раньше жил в настройках (manager_name/phone/photo).
+  // Если он был заполнен, а список менеджеров ещё пуст — переносим его сюда
+  // одной записью, а не стираем: у заказчика могли быть реальные данные.
+  if (!d.managers.length && d.settings?.manager_name) {
+    d.managers.push({
+      id: 'mgr1',
+      name: d.settings.manager_name,
+      position: '',
+      phone: d.settings.manager_phone || '',
+      photo: d.settings.manager_photo || '',
+      sort: 1,
+    })
+  }
+  if (d.settings) {
+    delete d.settings.manager_name
+    delete d.settings.manager_phone
+    delete d.settings.manager_photo
+  }
 
   return d
 }
@@ -540,9 +570,22 @@ export const snapshot = () => {
 
 const clone = (v) => JSON.parse(JSON.stringify(v))
 const catName = (id) => data.categories.find((c) => c.id === id)?.name ?? ''
+/** Назначенный модели менеджер — целиком, а не только имя: карточке модели
+    нужны ещё телефон и фото. Без назначения — null, блок на странице просто
+    не показывается. */
+const managerInfo = (id) => {
+  if (!id) return null
+  const m = data.managers.find((x) => x.id === id)
+  return m ? clone(m) : null
+}
 /* gallery появилось позже photo: у моделей, сохранённых до этой правки,
    поля в файле нет вовсе — отдаём пустой массив, а не undefined. */
-const withCat = (m) => ({ ...clone(m), gallery: m.gallery || [], catName: catName(m.cat) })
+const withCat = (m) => ({
+  ...clone(m),
+  gallery: m.gallery || [],
+  catName: catName(m.cat),
+  manager: managerInfo(m.managerId),
+})
 const bySort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0)
 
 /** Следующий номер в списке (новый элемент встаёт в конец). */
@@ -683,6 +726,10 @@ export const models = {
       badge: cleanBadge(body.badge),
       flagship: !!body.flagship,
       testimonial: cleanTestimonial(body.testimonial),
+      // Персональный менеджер для этой модели — необязателен, пуст по
+      // умолчанию (id проверяется в маршруте, как и cat). Правильность
+      // ссылки на существующего менеджера — забота вызывающего кода.
+      managerId: str(body.managerId, MAX.name),
       // Переводы (п.16 дорожной карты) — необязательны и пусты по умолчанию:
       // без перевода сайт на kk/en просто показывает русский текст (см.
       // shared/i18n-fallback.js), а не пустую карточку.
@@ -713,6 +760,7 @@ export const models = {
     if (body.badge !== undefined) m.badge = cleanBadge(body.badge)
     if (body.flagship !== undefined) m.flagship = !!body.flagship
     if (body.testimonial !== undefined) m.testimonial = cleanTestimonial(body.testimonial)
+    if (body.managerId !== undefined) m.managerId = str(body.managerId, MAX.name)
     if (body.name_kk !== undefined) m.name_kk = str(body.name_kk, MAX.name)
     if (body.name_en !== undefined) m.name_en = str(body.name_en, MAX.name)
     if (body.short_kk !== undefined) m.short_kk = str(body.short_kk, MAX.short)
@@ -989,6 +1037,61 @@ export const serviceCenters = {
   reorder: (ids) => applyOrder(data.serviceCenters, ids),
 }
 
+/*
+ * Персональные менеджеры — раньше был один на весь сайт (настройки
+ * manager_name/phone/photo), теперь список: у каждой модели каталога можно
+ * выбрать своего (см. managerId в models). Публикуется на карточке модели
+ * только когда назначен и у него заполнены имя и телефон — см. withCat().
+ */
+export const managers = {
+  all: () => clone(data.managers).sort(bySort),
+  exists: (id) => data.managers.some((x) => x.id === id),
+  get: (id) => {
+    const m = data.managers.find((x) => x.id === id)
+    return m ? clone(m) : null
+  },
+  create(b) {
+    if (data.managers.length >= MAX.list) {
+      throw Object.assign(new Error('Менеджеров уже максимум'), { status: 400 })
+    }
+    const m = {
+      id: newId('mgr'),
+      name: str(b?.name, MAX.name) || 'Новый менеджер',
+      position: str(b?.position, MAX.note),
+      phone: str(b?.phone, MAX.note),
+      photo: safeMedia(b?.photo),
+      sort: nextSort(data.managers),
+    }
+    data.managers.push(m)
+    save()
+    return clone(m)
+  },
+  update(id, b) {
+    const m = data.managers.find((x) => x.id === id)
+    if (!m) return null
+    if (b.name !== undefined) m.name = str(b.name, MAX.name) || m.name
+    if (b.position !== undefined) m.position = str(b.position, MAX.note)
+    if (b.phone !== undefined) m.phone = str(b.phone, MAX.note)
+    if (b.photo !== undefined) m.photo = safeMedia(b.photo)
+    save()
+    return clone(m)
+  },
+  /** Удаление менеджера снимает его со всех моделей, где он был назначен —
+      иначе карточка модели ссылалась бы на несуществующую запись. */
+  remove(id) {
+    const i = data.managers.findIndex((x) => x.id === id)
+    if (i === -1) return false
+    data.managers.splice(i, 1)
+    for (const m of data.models) if (m.managerId === id) m.managerId = ''
+    save()
+    return true
+  },
+  reorder: (ids) => applyOrder(data.managers, ids),
+
+  /** Пользуется ли кто-то этим фото — спрашивает библиотека медиа. */
+  usesPhoto: (path) => data.managers.filter((m) => m.photo === path).map((m) => m.name),
+}
+
 /* -------------------------------- регионы -------------------------------- */
 
 export const regions = {
@@ -1042,7 +1145,7 @@ export const media = {
   },
   /** Кто использует эту картинку — чтобы не удалить фото из-под живой карточки. */
   usedBy(path) {
-    return [...models.usesPhoto(path), ...news.usesCover(path)]
+    return [...models.usesPhoto(path), ...news.usesCover(path), ...managers.usesPhoto(path)]
   },
 }
 
@@ -1567,10 +1670,9 @@ const SETTING_KEYS = [
      Пустая — на «Контактах» показывается адрес текстом и ссылка «Открыть
      в картах», без встраивания. */
   'map_embed_url',
-  // Персональный менеджер и сезонный баннер на карточке модели (задача 10).
-  'manager_name',
-  'manager_phone',
-  'manager_photo',
+  // Сезонный баннер на карточке модели (задача 10). Персональный менеджер
+  // раньше был здесь же (manager_name/phone/photo) — теперь это отдельная
+  // сущность managers, назначаемая на модель, см. export const managers.
   /* Строковый флаг, а не булево: все настройки в этом хранилище — строки,
      проверенные str() (см. ниже), а str(true, …) вернул бы '' и стёр бы
      сам флаг. '1' — включено, '' — выключено. */
@@ -1584,7 +1686,7 @@ const URL_KEYS = new Set([
 /* Фото на главной и на странице «О компании» — не ссылка, а путь к своей
    картинке (/assets/… из комплекта или /uploads/… из библиотеки), поэтому
    проверяются той же safeMedia(), что и фото модели, а не safeUrl(). */
-const MEDIA_KEYS = new Set(['hero_photo', 'about_photo', 'manager_photo'])
+const MEDIA_KEYS = new Set(['hero_photo', 'about_photo'])
 
 export const settings = {
   /** Публичные настройки — без пароля админки. */

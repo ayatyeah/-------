@@ -1544,6 +1544,12 @@ h4 {
   font-size: 16px;
 }
 
+.manager-position {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 2px;
+}
+
 .manager-phone {
   font-size: 14px;
   color: var(--green-700);
@@ -5464,6 +5470,35 @@ select.input {
   width: 210px;
 }
 
+/* --- менеджеры: имя/должность/телефон + фото ------------------------------ */
+
+.mgr-admin-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mgr-admin-row:last-of-type {
+  border-bottom: none;
+}
+
+.mgr-admin-row-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* MediaPicker рендерит себя как .field — растягиваем на всю ширину ряда,
+   под тремя текстовыми полями, а не в четвёртую колонку. */
+.mgr-admin-row-fields > .field {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 .cert-file-preview {
   display: flex;
   align-items: center;
@@ -5634,6 +5669,15 @@ select.input {
   }
 
   .sc-admin-row-fields {
+    grid-template-columns: 1fr;
+    flex-basis: 100%;
+  }
+
+  .mgr-admin-row {
+    flex-wrap: wrap;
+  }
+
+  .mgr-admin-row-fields {
     grid-template-columns: 1fr;
     flex-basis: 100%;
   }

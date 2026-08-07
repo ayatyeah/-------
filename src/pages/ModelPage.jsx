@@ -237,18 +237,19 @@ export default function ModelPage() {
           )}
 
           {/* Консультативные CTA с персональным менеджером — блок целиком
-              скрыт, пока в настройках не указаны имя и телефон: ничего
-              выдуманного вместо реального сотрудника показывать нельзя. */}
-          {settings.manager_name && settings.manager_phone && (
+              скрыт, пока у модели не назначен менеджер с именем и телефоном:
+              ничего выдуманного вместо реального сотрудника показывать нельзя.
+              Менеджер выбирается для каждой модели отдельно в её форме в
+              админке (задача 10, расширена — раньше был один на весь сайт). */}
+          {m.manager?.name && m.manager?.phone && (
             <div className="manager-card">
-              {settings.manager_photo && (
-                <img src={settings.manager_photo} alt="" className="manager-photo" />
-              )}
+              {m.manager.photo && <img src={m.manager.photo} alt="" className="manager-photo" />}
               <div>
                 <div className="manager-title">{t('manager_title')}</div>
-                <div className="manager-name">{settings.manager_name}</div>
-                <a className="manager-phone" href={`tel:${settings.manager_phone.replace(/[^\d+]/g, '')}`}>
-                  {settings.manager_phone}
+                <div className="manager-name">{m.manager.name}</div>
+                {m.manager.position && <div className="manager-position">{m.manager.position}</div>}
+                <a className="manager-phone" href={`tel:${m.manager.phone.replace(/[^\d+]/g, '')}`}>
+                  {m.manager.phone}
                 </a>
               </div>
               <div className="manager-actions">

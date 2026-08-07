@@ -685,6 +685,28 @@ app.post('/api/service-centers/reorder', requireAdmin, limitAdminWrite, wrap((re
   res.json(store.serviceCenters.all())
 }))
 
+/* ─── Персональные менеджеры ─────────────────────────────────────────────
+   Список менеджеров, каждый назначается на конкретные модели каталога
+   (models.managerId) — карточка модели показывает своего, а не одного
+   общего на весь сайт. */
+app.get('/api/managers', wrap((_req, res) => res.json(store.managers.all())))
+app.post('/api/managers', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.managers.create(req.body || {}))
+}))
+app.put('/api/managers/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const m = store.managers.update(req.params.id, req.body || {})
+  if (!m) return res.status(404).json({ error: 'Менеджер не найден' })
+  res.json(m)
+}))
+app.delete('/api/managers/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  if (!store.managers.remove(req.params.id)) return res.status(404).json({ error: 'Менеджер не найден' })
+  res.json({ ok: true })
+}))
+app.post('/api/managers/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.managers.reorder(req.body?.ids)
+  res.json(store.managers.all())
+}))
+
 /* ─── Регионы формы КП ──────────────────────────────────────────────────
    Список заменяется целиком: в админке это одно поле, где области идут
    построчно — так проще, чем заводить карточку на каждую строку. */
@@ -728,9 +750,12 @@ app.get('/api/models/:id/sheet.pdf', wrap((req, res) => {
 }))
 
 app.post('/api/models', requireAdmin, limitAdminWrite, wrap((req, res) => {
-  const { name, cat } = req.body || {}
+  const { name, cat, managerId } = req.body || {}
   if (!name || !cat) return res.status(400).json({ error: 'Укажите название и категорию' })
   if (!store.categories.exists(cat)) return res.status(400).json({ error: 'Неизвестная категория' })
+  if (managerId && !store.managers.exists(managerId)) {
+    return res.status(400).json({ error: 'Неизвестный менеджер' })
+  }
   res.status(201).json(store.models.create(req.body))
 }))
 
@@ -738,6 +763,9 @@ app.put('/api/models/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
   const b = req.body || {}
   if (b.cat && !store.categories.exists(b.cat)) {
     return res.status(400).json({ error: 'Неизвестная категория' })
+  }
+  if (b.managerId && !store.managers.exists(b.managerId)) {
+    return res.status(400).json({ error: 'Неизвестный менеджер' })
   }
   const m = store.models.update(req.params.id, b)
   if (!m) return res.status(404).json({ error: 'Модель не найдена' })

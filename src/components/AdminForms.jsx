@@ -119,7 +119,7 @@ function SpecsEditor({ specs, onChange, template = [] }) {
 }
 
 /** Создание и редактирование модели техники. */
-export function ModelForm({ model, cats, onSave, onClose }) {
+export function ModelForm({ model, cats, managers = [], onSave, onClose }) {
   const isNew = !model
   const [f, setF] = useState({
     name: model?.name ?? '',
@@ -133,6 +133,7 @@ export function ModelForm({ model, cats, onSave, onClose }) {
     badge: model?.badge ?? '',
     flagship: model?.flagship ?? false,
     testimonial: model?.testimonial ?? { quote: '', author: '' },
+    managerId: model?.managerId ?? '',
     name_kk: model?.name_kk ?? '',
     name_en: model?.name_en ?? '',
     short_kk: model?.short_kk ?? '',
@@ -400,6 +401,32 @@ export function ModelForm({ model, cats, onSave, onClose }) {
             <option value="in_stock">В наличии</option>
             <option value="on_order">Под заказ</option>
           </select>
+        </div>
+
+        {/* Персональный менеджер — необязателен. Список ведётся в разделе
+            «Главная страница» → «Менеджеры»; здесь только назначение на
+            конкретную модель, у разных моделей может быть свой. */}
+        <div className="field">
+          <label htmlFor="m_manager">Персональный менеджер</label>
+          <select
+            id="m_manager"
+            className="input"
+            value={f.managerId}
+            onChange={(e) => upd('managerId', e.target.value)}
+          >
+            <option value="">Без менеджера</option>
+            {managers.map((mgr) => (
+              <option key={mgr.id} value={mgr.id}>
+                {mgr.name}
+                {mgr.position ? ` — ${mgr.position}` : ''}
+              </option>
+            ))}
+          </select>
+          {managers.length === 0 && (
+            <small className="admin-hint">
+              Список пуст — добавьте менеджеров в «Главная страница» → «Менеджеры».
+            </small>
+          )}
         </div>
 
         {/* Отзыв хозяйства — необязателен и пуст по умолчанию: показываем на

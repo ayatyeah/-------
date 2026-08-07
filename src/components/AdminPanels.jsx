@@ -868,6 +868,106 @@ export function ServiceCentersPanel({ centers, reload }) {
   )
 }
 
+/* -------------------------- персональные менеджеры ------------------------- */
+
+/**
+ * Менеджеры — раньше был один на весь сайт (поля в «Настройках»), теперь
+ * список: у каждой модели каталога в её форме можно выбрать своего. Здесь
+ * только сам справочник (имя, должность, телефон, фото); кто из них
+ * показан на карточке конкретной модели — решается в форме этой модели.
+ */
+export function ManagersPanel({ managers, reload }) {
+  const { showToast } = useSite()
+  const [busy, setBusy] = useState(false)
+  const move = useReorder(managers, api.admin.reorderManagers, reload)
+
+  const изменить = async (item, patch) => {
+    try {
+      await api.admin.updateManager(item.id, patch)
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const добавить = async () => {
+    setBusy(true)
+    try {
+      await api.admin.createManager({ name: '', position: '', phone: '', photo: '' })
+      reload()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const удалить = async (item) => {
+    if (!confirm(`Удалить менеджера «${item.name}»? Он будет снят со всех моделей, где назначен.`)) return
+    try {
+      await api.admin.deleteManager(item.id)
+      showToast('Удалено')
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  return (
+    <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+      <h3>Менеджеры</h3>
+      <p className="admin-hint" style={{ marginBottom: 12 }}>
+        Показывается на странице модели («выезд в хозяйство» / «демо-показ»), если менеджер
+        назначен ей в форме модели — вкладка «Каталог». Блок появляется, только когда у менеджера
+        заполнены имя и телефон.
+      </p>
+
+      {managers.map((mgr, i) => (
+        <div key={mgr.id} className="mgr-admin-row">
+          <MoveButtons index={i} total={managers.length} onMove={move} />
+          <div className="mgr-admin-row-fields">
+            <input
+              className="input"
+              defaultValue={mgr.name}
+              placeholder="Имя, например «Айдос Ермеков»"
+              onBlur={(e) => e.target.value !== mgr.name && изменить(mgr, { name: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={mgr.position}
+              placeholder="Должность, например «менеджер по продажам»"
+              onBlur={(e) => e.target.value !== mgr.position && изменить(mgr, { position: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={mgr.phone}
+              placeholder="Телефон"
+              onBlur={(e) => e.target.value !== mgr.phone && изменить(mgr, { phone: e.target.value })}
+            />
+            <MediaPicker value={mgr.photo} onChange={(v) => изменить(mgr, { photo: v })} label="Фото" />
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => удалить(mgr)}
+            aria-label="Удалить"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+
+      <button type="button" className="btn btn-secondary btn-sm" onClick={добавить} disabled={busy} style={{ marginTop: 14 }}>
+        + Добавить менеджера
+      </button>
+
+      <small className="admin-hint" style={{ display: 'block', marginTop: 10 }}>
+        Текстовые поля сохраняются при переходе к другому, фото — сразу при выборе.
+      </small>
+    </div>
+  )
+}
+
 /* ------------------------------- фото сайта ------------------------------- */
 
 /**

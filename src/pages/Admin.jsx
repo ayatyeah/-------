@@ -5,13 +5,13 @@ import { useSite } from '../store'
 import { ErrorState, EmptyState, Dialog } from '../components/ui'
 import { ModelForm, NewsForm } from '../components/AdminForms'
 import CatalogImportPanel from '../components/AdminCatalogImport'
-import MediaPicker from '../components/MediaPicker'
 import {
   CategoriesPanel,
   ServicesPanel,
   StatsPanel,
   CertsPanel,
   ServiceCentersPanel,
+  ManagersPanel,
   PhotosPanel,
   RegionsPanel,
   PasswordPanel,
@@ -415,7 +415,7 @@ function SummaryTab({ summary, requests, onGoTab, onMonthChange }) {
 
 /* ---------------------------- вкладка: каталог --------------------------- */
 
-function CatalogTab({ models, cats, reload }) {
+function CatalogTab({ models, cats, managers, reload }) {
   const { showToast } = useSite()
   const [editing, setEditing] = useState(null) // { model } | { model: null } для новой
   const [importing, setImporting] = useState(false)
@@ -566,6 +566,7 @@ function CatalogTab({ models, cats, reload }) {
         <ModelForm
           model={editing.model}
           cats={cats}
+          managers={managers}
           onSave={save}
           onClose={() => setEditing(null)}
         />
@@ -1368,8 +1369,6 @@ const SETTINGS_FIELD_LABELS = {
   hero_title: 'Заголовок героя',
   hero_subtitle: 'Подзаголовок',
   map_embed_url: 'Карта на «Контактах»',
-  manager_name: 'Имя менеджера',
-  manager_phone: 'Телефон менеджера',
   season_banner_text: 'Текст баннера',
 }
 
@@ -1524,19 +1523,6 @@ function SettingsTab({ onRelogin }) {
         </div>
 
         <div className="admin-settings-panel">
-          <h3>Персональный менеджер</h3>
-          <p className="admin-hint" style={{ marginBottom: 12 }}>
-            Показывается на странице модели как «выезд в хозяйство» / «демо-показ» —
-            блок появляется, только когда указаны имя и телефон. Пустое поле —
-            блока просто нет, ничего выдуманного на сайт не попадёт.
-          </p>
-          {field('manager_name', 'Имя и должность', 'input', 'Айдос, менеджер по продажам')}
-          {field('manager_phone', 'Телефон', 'input', '+7 700 123 45 67')}
-          <MediaPicker value={f.manager_photo} onChange={(v) => upd('manager_photo', v)} label="Фото менеджера" />
-          {saveButton('manager', ['manager_name', 'manager_phone', 'manager_photo'], 'Менеджер')}
-        </div>
-
-        <div className="admin-settings-panel">
           <h3>Сезонный баннер</h3>
           <p className="admin-hint" style={{ marginBottom: 12 }}>
             Строка над каталогом и карточкой модели на время посевной/уборочной —
@@ -1577,7 +1563,7 @@ function SettingsTab({ onRelogin }) {
  * то есть заказчику обязательно нужно их поменять, и он должен мочь это
  * сделать сам.
  */
-function MainTab({ stats, certs, serviceCenters, reload }) {
+function MainTab({ stats, certs, serviceCenters, managers, reload }) {
   return (
     <>
       <div className="admin-head">
@@ -1592,6 +1578,7 @@ function MainTab({ stats, certs, serviceCenters, reload }) {
         <StatsPanel stats={stats} reload={reload} />
         <CertsPanel certs={certs} reload={reload} />
         <ServiceCentersPanel centers={serviceCenters} reload={reload} />
+        <ManagersPanel managers={managers} reload={reload} />
       </div>
     </>
   )
@@ -1612,6 +1599,7 @@ export default function Admin() {
   const [stats, setStats] = useState([])
   const [certs, setCerts] = useState([])
   const [serviceCenters, setServiceCenters] = useState([])
+  const [managers, setManagers] = useState([])
   const [requests, setRequests] = useState([])
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
@@ -1621,7 +1609,7 @@ export default function Admin() {
     setLoading(true)
     setError(null)
     try {
-      const [m, c, n, r, s, sv, st, ct, scs] = await Promise.all([
+      const [m, c, n, r, s, sv, st, ct, scs, mgrs] = await Promise.all([
         api.admin.models(),
         api.categories(),
         api.admin.news(),
@@ -1631,6 +1619,7 @@ export default function Admin() {
         api.stats(),
         api.certs(),
         api.serviceCenters(),
+        api.managers(),
       ])
       setModels(m)
       setCats(c)
@@ -1641,6 +1630,7 @@ export default function Admin() {
       setStats(st)
       setCerts(ct)
       setServiceCenters(scs)
+      setManagers(mgrs)
     } catch (e) {
       // Токен протух или сервер отверг — возвращаем на экран входа.
       if (!getToken()) setAuthed(false)
@@ -1736,12 +1726,20 @@ export default function Admin() {
                 onMonthChange={loadSummaryMonth}
               />
             )}
-            {tab === 'catalog' && <CatalogTab models={models} cats={cats} reload={load} />}
+            {tab === 'catalog' && (
+              <CatalogTab models={models} cats={cats} managers={managers} reload={load} />
+            )}
             {tab === 'services' && <ServicesPanel services={services} reload={load} />}
             {tab === 'news' && <NewsTab news={news} reload={load} />}
             {tab === 'requests' && <RequestsTab requests={requests} reload={load} models={models} />}
             {tab === 'main' && (
-              <MainTab stats={stats} certs={certs} serviceCenters={serviceCenters} reload={load} />
+              <MainTab
+                stats={stats}
+                certs={certs}
+                serviceCenters={serviceCenters}
+                managers={managers}
+                reload={load}
+              />
             )}
             {tab === 'settings' && <SettingsTab onRelogin={logout} />}
           </>

@@ -48,6 +48,9 @@ export const api = {
   /** Сервисные центры — адрес и телефон конкретных точек обслуживания. */
   serviceCenters: () => request('/service-centers'),
 
+  /** Персональные менеджеры — назначаются на модели каталога (model.managerId). */
+  managers: () => request('/managers'),
+
   createRequest: (body) => request('/requests', { method: 'POST', body }),
 
   /** Маячок визита — раз за вкладку браузера, см. src/App.jsx. */
@@ -149,6 +152,11 @@ export const api = {
     deleteServiceCenter: (id) => request(`/service-centers/${id}`, { method: 'DELETE', auth: true }),
     reorderServiceCenters: (ids) =>
       request('/service-centers/reorder', { method: 'POST', body: { ids }, auth: true }),
+
+    createManager: (body) => request('/managers', { method: 'POST', body, auth: true }),
+    updateManager: (id, body) => request(`/managers/${id}`, { method: 'PUT', body, auth: true }),
+    deleteManager: (id) => request(`/managers/${id}`, { method: 'DELETE', auth: true }),
+    reorderManagers: (ids) => request('/managers/reorder', { method: 'POST', body: { ids }, auth: true }),
 
     saveRegions: (regions) => request('/regions', { method: 'PUT', body: { regions }, auth: true }),
 
