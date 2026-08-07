@@ -1604,9 +1604,15 @@ export default function Admin() {
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Показываем скелет только на самой первой загрузке. Без этого любое
+  // сохранение поля в справочнике (менеджеры, сервисные центры и т.п.)
+  // дёргает reload() → load() → на миг loading=true → весь admin-main
+  // размонтируется и появляется заново — страница дёргается наверх, а
+  // фокус слетает с поля, в которое только что кликнули.
+  const loadedOnce = useRef(false)
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!loadedOnce.current) setLoading(true)
     setError(null)
     try {
       const [m, c, n, r, s, sv, st, ct, scs, mgrs] = await Promise.all([
@@ -1631,6 +1637,7 @@ export default function Admin() {
       setCerts(ct)
       setServiceCenters(scs)
       setManagers(mgrs)
+      loadedOnce.current = true
     } catch (e) {
       // Токен протух или сервер отверг — возвращаем на экран входа.
       if (!getToken()) setAuthed(false)
