@@ -2298,20 +2298,24 @@ select.input {
 .bar-list li {
   display: grid;
   grid-template-columns: 1fr 2fr auto;
-  align-items: center;
+  align-items: start;
   gap: 10px;
   font-size: 13px;
 }
 
+/* Названия моделей часто различаются только последними словами
+   («…КУН-0.8 Стандарт» / «…КУН-0.8 с джойстиком») — обрезать в одну
+   строку с многоточием означало бы показать две неотличимые друг от
+   друга строки. Поэтому переносим целиком, а не режем. */
 .bar-list-label {
   color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  line-height: 1.35;
 }
 
 .bar-list-track {
   height: 8px;
+  margin-top: 3px;
   border-radius: var(--r-xs);
   background: var(--rule);
   overflow: hidden;
