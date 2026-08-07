@@ -926,6 +926,35 @@ h4 {
   flex: 1;
 }
 
+.card-specs {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.card-specs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.card-specs li span {
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-specs li b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .card-actions {
   display: flex;
   gap: 10px;
@@ -1224,6 +1253,58 @@ h4 {
 .filter-count {
   font-size: 13px;
   opacity: 0.75;
+}
+
+.filter-facets {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.facet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.facet-clear {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+  text-decoration: underline;
+}
+
+.facet-clear:hover {
+  color: var(--brass-600);
+}
+
+.facet-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.facet-range .input {
+  padding: 7px 9px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.facet-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.facet-value {
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .catalog-count {

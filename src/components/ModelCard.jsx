@@ -42,6 +42,18 @@ export default function ModelCard({ model: m, href, delay = 0 }) {
             </Link>
           </h3>
           <p className="card-text">{m.short}</p>
+          {/* 2-3 ключевые характеристики прямо на карточке (задача 9) —
+              чтобы сравнивать модели, не открывая каждую по очереди. */}
+          {m.specs?.length > 0 && (
+            <ul className="card-specs">
+              {m.specs.slice(0, 3).map((s, i) => (
+                <li key={i}>
+                  <span>{td(s.k)}</span>
+                  <b>{s.v}</b>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="card-actions">
             <Link to={href} className="btn btn-primary btn-sm">
               {t('more')}

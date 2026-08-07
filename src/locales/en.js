@@ -145,6 +145,12 @@ export default {
     cat_shown: 'Models shown:',
     cat_empty_t: 'Nothing in this category yet',
     cat_empty_p: 'Pick another category or browse all machinery.',
+    cat_search_ph: 'Search: name, description, specifications',
+    cat_specs_filter: 'By specifications',
+    cat_facet_reset: 'reset',
+    cat_reset_all: 'Reset all filters',
+    cat_empty_filtered_t: 'Nothing matches these filters',
+    cat_empty_filtered_p: 'Try loosening the search or resetting the filters.',
 
     back_catalog: '← Back to catalog',
     photo: 'photo',
