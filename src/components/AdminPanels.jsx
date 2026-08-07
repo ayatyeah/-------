@@ -756,6 +756,118 @@ export function CertsPanel({ certs, reload }) {
   )
 }
 
+/* --------------------------- сервисные центры ----------------------------- */
+
+/**
+ * Сервисные центры (п.12 дорожной карты) — адрес и телефон конкретной точки
+ * обслуживания, отдельно от общего адреса завода на «Контактах». Список
+ * пуст по умолчанию: показатель «34 сервисных центра» на главной остаётся
+ * маркетинговой цифрой, а сюда заказчик вносит только реальные точки —
+ * раздел на «Контактах» появляется, только когда здесь есть хотя бы одна.
+ */
+export function ServiceCentersPanel({ centers, reload }) {
+  const { showToast } = useSite()
+  const [busy, setBusy] = useState(false)
+  const move = useReorder(centers, api.admin.reorderServiceCenters, reload)
+
+  const изменить = async (item, patch) => {
+    try {
+      await api.admin.updateServiceCenter(item.id, patch)
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const добавить = async () => {
+    setBusy(true)
+    try {
+      await api.admin.createServiceCenter({ name: '', region: '', address: '', phone: '', mapUrl: '' })
+      reload()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const удалить = async (item) => {
+    if (!confirm(`Удалить сервисный центр «${item.name}»?`)) return
+    try {
+      await api.admin.deleteServiceCenter(item.id)
+      showToast('Удалено')
+      reload()
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  return (
+    <div className="admin-settings-panel" style={{ gridColumn: '1 / -1' }}>
+      <h3>Сервисные центры</h3>
+      <p className="admin-hint" style={{ marginBottom: 12 }}>
+        Список на странице «Контакты». Пока здесь пусто — раздел на сайте не показывается: адреса
+        не выдумываем, добавляйте только реальные точки обслуживания.
+      </p>
+
+      {centers.map((c, i) => (
+        <div key={c.id} className="sc-admin-row">
+          <MoveButtons index={i} total={centers.length} onMove={move} />
+          <div className="sc-admin-row-fields">
+            <input
+              className="input"
+              defaultValue={c.name}
+              placeholder="Название (например, «СХМ-Сервис Костанай»)"
+              onBlur={(e) => e.target.value !== c.name && изменить(c, { name: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={c.region}
+              placeholder="Область"
+              onBlur={(e) => e.target.value !== c.region && изменить(c, { region: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={c.address}
+              placeholder="Адрес"
+              onBlur={(e) => e.target.value !== c.address && изменить(c, { address: e.target.value })}
+            />
+            <input
+              className="input"
+              defaultValue={c.phone}
+              placeholder="Телефон"
+              onBlur={(e) => e.target.value !== c.phone && изменить(c, { phone: e.target.value })}
+            />
+            <input
+              className="input"
+              style={{ gridColumn: '1 / -1' }}
+              defaultValue={c.mapUrl}
+              placeholder="Ссылка на 2ГИС/Яндекс.Карты — необязательно, https://…"
+              onBlur={(e) => e.target.value !== c.mapUrl && изменить(c, { mapUrl: e.target.value })}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => удалить(c)}
+            aria-label="Удалить"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+
+      <button type="button" className="btn btn-secondary btn-sm" onClick={добавить} disabled={busy} style={{ marginTop: 14 }}>
+        + Добавить сервисный центр
+      </button>
+
+      <small className="admin-hint" style={{ display: 'block', marginTop: 10 }}>
+        Правки сохраняются при переходе к другому полю.
+      </small>
+    </div>
+  )
+}
+
 /* ------------------------------- фото сайта ------------------------------- */
 
 /**

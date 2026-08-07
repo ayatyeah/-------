@@ -650,6 +650,27 @@ app.post('/api/certs/reorder', requireAdmin, limitAdminWrite, wrap((req, res) =>
   res.json(store.certs.all())
 }))
 
+/* ─── Сервисные центры (п.12 дорожной карты) ────────────────────────────
+   Адрес и телефон конкретной точки обслуживания — список показывается на
+   «Контактах», только если заказчик реально его заполнил (см. store.js). */
+app.get('/api/service-centers', wrap((_req, res) => res.json(store.serviceCenters.all())))
+app.post('/api/service-centers', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  res.status(201).json(store.serviceCenters.create(req.body || {}))
+}))
+app.put('/api/service-centers/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  const c = store.serviceCenters.update(req.params.id, req.body || {})
+  if (!c) return res.status(404).json({ error: 'Центр не найден' })
+  res.json(c)
+}))
+app.delete('/api/service-centers/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  if (!store.serviceCenters.remove(req.params.id)) return res.status(404).json({ error: 'Центр не найден' })
+  res.json({ ok: true })
+}))
+app.post('/api/service-centers/reorder', requireAdmin, limitAdminWrite, wrap((req, res) => {
+  store.serviceCenters.reorder(req.body?.ids)
+  res.json(store.serviceCenters.all())
+}))
+
 /* ─── Регионы формы КП ──────────────────────────────────────────────────
    Список заменяется целиком: в админке это одно поле, где области идут
    построчно — так проще, чем заводить карточку на каждую строку. */

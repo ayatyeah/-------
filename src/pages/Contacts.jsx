@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { api } from '../api'
-import { useSite } from '../store'
+import { useSite, useFetch } from '../store'
 import Reveal from '../components/Reveal'
 import { ConsentCheck, Honeypot } from '../components/ui'
 import Icon from '../components/Icon'
@@ -86,6 +86,44 @@ function MapBlock() {
         style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
       />
     </div>
+  )
+}
+
+/**
+ * Список сервисных центров (п.12 дорожной карты) — отдельно от адреса
+ * завода в блоке выше. Показывается, только когда админ реально добавил
+ * хотя бы один центр (см. server/store.js): выдуманных адресов на сайте
+ * быть не должно, а пустой раздел — не повод его рисовать.
+ */
+function ServiceCenters() {
+  const { t } = useT()
+  const { data: centers } = useFetch(() => api.serviceCenters(), [])
+
+  if (!centers?.length) return null
+
+  return (
+    <Reveal className="wrap service-centers" delay={80}>
+      <h2>{t('svc_title')}</h2>
+      <div className="service-centers-grid">
+        {centers.map((c) => (
+          <div className="service-center-card" key={c.id}>
+            <h3>{c.name}</h3>
+            {c.region && <div className="service-center-region">{c.region}</div>}
+            {c.address && <div className="service-center-address">{c.address}</div>}
+            <div className="service-center-actions">
+              {c.phone && (
+                <a href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}>{c.phone}</a>
+              )}
+              {c.mapUrl && (
+                <a href={c.mapUrl} target="_blank" rel="noopener noreferrer">
+                  {t('svc_open_map')}
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Reveal>
   )
 }
 
@@ -235,6 +273,8 @@ export default function Contacts() {
           </Reveal>
         </div>
       </div>
+
+      <ServiceCenters />
     </main>
   )
 }

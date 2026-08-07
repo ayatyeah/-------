@@ -184,6 +184,8 @@ export default {
     map_open_2gis: 'Open in 2GIS',
     map_privacy_note: 'The map loads from 2GIS servers — nothing is sent there until you click.',
     map_iframe_title: 'Location map',
+    svc_title: 'Service centers',
+    svc_open_map: 'Show on map',
     fb_title: 'Contact form',
     fb_lead: 'Leave a message — we’ll call you back during working hours.',
     f_name: 'Your name',

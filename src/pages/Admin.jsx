@@ -11,6 +11,7 @@ import {
   ServicesPanel,
   StatsPanel,
   CertsPanel,
+  ServiceCentersPanel,
   PhotosPanel,
   RegionsPanel,
   PasswordPanel,
@@ -1559,7 +1560,7 @@ function SettingsTab({ onRelogin }) {
  * то есть заказчику обязательно нужно их поменять, и он должен мочь это
  * сделать сам.
  */
-function MainTab({ stats, certs, reload }) {
+function MainTab({ stats, certs, serviceCenters, reload }) {
   return (
     <>
       <div className="admin-head">
@@ -1573,6 +1574,7 @@ function MainTab({ stats, certs, reload }) {
         <PhotosPanel />
         <StatsPanel stats={stats} reload={reload} />
         <CertsPanel certs={certs} reload={reload} />
+        <ServiceCentersPanel centers={serviceCenters} reload={reload} />
       </div>
     </>
   )
@@ -1592,6 +1594,7 @@ export default function Admin() {
   const [services, setServices] = useState([])
   const [stats, setStats] = useState([])
   const [certs, setCerts] = useState([])
+  const [serviceCenters, setServiceCenters] = useState([])
   const [requests, setRequests] = useState([])
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
@@ -1601,7 +1604,7 @@ export default function Admin() {
     setLoading(true)
     setError(null)
     try {
-      const [m, c, n, r, s, sv, st, ct] = await Promise.all([
+      const [m, c, n, r, s, sv, st, ct, scs] = await Promise.all([
         api.admin.models(),
         api.categories(),
         api.admin.news(),
@@ -1610,6 +1613,7 @@ export default function Admin() {
         api.services(),
         api.stats(),
         api.certs(),
+        api.serviceCenters(),
       ])
       setModels(m)
       setCats(c)
@@ -1619,6 +1623,7 @@ export default function Admin() {
       setServices(sv)
       setStats(st)
       setCerts(ct)
+      setServiceCenters(scs)
     } catch (e) {
       // Токен протух или сервер отверг — возвращаем на экран входа.
       if (!getToken()) setAuthed(false)
@@ -1718,7 +1723,9 @@ export default function Admin() {
             {tab === 'services' && <ServicesPanel services={services} reload={load} />}
             {tab === 'news' && <NewsTab news={news} reload={load} />}
             {tab === 'requests' && <RequestsTab requests={requests} reload={load} models={models} />}
-            {tab === 'main' && <MainTab stats={stats} certs={certs} reload={load} />}
+            {tab === 'main' && (
+              <MainTab stats={stats} certs={certs} serviceCenters={serviceCenters} reload={load} />
+            )}
             {tab === 'settings' && <SettingsTab onRelogin={logout} />}
           </>
         )}

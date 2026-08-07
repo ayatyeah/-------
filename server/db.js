@@ -200,6 +200,14 @@ const COLLECTIONS = [
     apply: (d, docs) => { d.certs = docs.sort(bySort) },
   },
   {
+    name: 'serviceCenters',
+    table: 'service_centers',
+    key: 'id',
+    cols: ['name', 'sort'],
+    rows: (d) => (d.serviceCenters || []).map((x) => ({ key: x.id, cols: [s(x.name), int(x.sort)], doc: x })),
+    apply: (d, docs) => { d.serviceCenters = docs.sort(bySort) },
+  },
+  {
     name: 'models',
     table: 'models',
     key: 'id',

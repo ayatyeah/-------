@@ -80,6 +80,15 @@ CREATE TABLE IF NOT EXISTS certs (
 );
 CREATE INDEX IF NOT EXISTS certs_sort_idx ON certs (sort);
 
+CREATE TABLE IF NOT EXISTS service_centers (
+  id         text PRIMARY KEY,
+  name       text,
+  sort       integer,
+  data       jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS service_centers_sort_idx ON service_centers (sort);
+
 -- ------------------------------- каталог ------------------------------------
 
 CREATE TABLE IF NOT EXISTS models (

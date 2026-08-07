@@ -131,6 +131,10 @@ export const safeMedia = (v) => {
   return s
 }
 
+/** Ссылку принимаем только пустую или явный https:// — прочее (в т.ч.
+    javascript:, data:, http://) отбрасываем в пустую строку. */
+const safeUrl = (v) => (/^https:\/\/\S+$/i.test(v) ? v : '')
+
 /** Число в заданных границах, иначе значение по умолчанию. */
 const num = (v, def, min, max) => {
   const n = Number(v)
@@ -255,6 +259,11 @@ function freshData() {
        просмотр карточки модели, начало заполнения формы, открытие AI-чата.
        modelViews — с разбивкой по модели, остальные два — просто по дням. */
     metrics: { modelViews: {}, formStarts: {}, aiChatOpens: {} },
+    /* Сервисные центры (п.12 дорожной карты) — пусто по умолчанию: цифра
+       «34 сервисных центра» в показателях остаётся маркетинговой оценкой,
+       а здесь — только те центры, чей адрес и телефон реально заполнил
+       заказчик. Список пуст — раздел на «Контактах» просто не показывается. */
+    serviceCenters: [],
   }
 }
 
@@ -399,6 +408,11 @@ function migrate(raw) {
   }))
   d.services = (Array.isArray(d.services) ? d.services : []).map((s, i) => ({
     ...s,
+    sort: s.sort ?? i + 1,
+  }))
+  d.serviceCenters = (Array.isArray(d.serviceCenters) ? d.serviceCenters : []).map((s, i) => ({
+    ...s,
+    id: String(s.id ?? 'sc' + (i + 1)),
     sort: s.sort ?? i + 1,
   }))
 
@@ -892,6 +906,59 @@ export const certs = {
     return true
   },
   reorder: (ids) => applyOrder(data.certs, ids),
+}
+
+/**
+ * Сервисные центры (п.12 дорожной карты) — адрес и телефон конкретной точки
+ * обслуживания, отдельно от общих контактов завода. Публикуется на
+ * «Контактах» списком, только если хотя бы один центр заполнен: выдуманные
+ * адреса недопустимы, а пустой список — не повод показывать пустой раздел.
+ */
+export const serviceCenters = {
+  all: () => clone(data.serviceCenters).sort(bySort),
+  get: (id) => {
+    const c = data.serviceCenters.find((x) => x.id === id)
+    return c ? clone(c) : null
+  },
+  create(b) {
+    if (data.serviceCenters.length >= MAX.list) {
+      throw Object.assign(new Error('Сервисных центров уже максимум'), { status: 400 })
+    }
+    const c = {
+      id: newId('sc'),
+      name: str(b?.name, MAX.name) || 'Новый центр',
+      region: str(b?.region, MAX.region),
+      address: str(b?.address, MAX.name),
+      phone: str(b?.phone, MAX.note),
+      // Ссылка на карту (2ГИС/Яндекс) — необязательна: без неё карточка
+      // всё равно покажет адрес и телефон, просто без ссылки «Показать на карте».
+      mapUrl: safeUrl(str(b?.mapUrl, MAX.setting)),
+      sort: nextSort(data.serviceCenters),
+    }
+    data.serviceCenters.push(c)
+    save()
+    return clone(c)
+  },
+  update(id, b) {
+    const c = data.serviceCenters.find((x) => x.id === id)
+    if (!c) return null
+    if (b.name !== undefined) c.name = str(b.name, MAX.name) || c.name
+    if (b.region !== undefined) c.region = str(b.region, MAX.region)
+    if (b.address !== undefined) c.address = str(b.address, MAX.name)
+    if (b.phone !== undefined) c.phone = str(b.phone, MAX.note)
+    // Пустая строка — осознанное «убрать ссылку», как и с фото сертификата.
+    if (b.mapUrl !== undefined) c.mapUrl = safeUrl(str(b.mapUrl, MAX.setting))
+    save()
+    return clone(c)
+  },
+  remove(id) {
+    const i = data.serviceCenters.findIndex((x) => x.id === id)
+    if (i === -1) return false
+    data.serviceCenters.splice(i, 1)
+    save()
+    return true
+  },
+  reorder: (ids) => applyOrder(data.serviceCenters, ids),
 }
 
 /* -------------------------------- регионы -------------------------------- */
@@ -1442,10 +1509,6 @@ const URL_KEYS = new Set([
    картинке (/assets/… из комплекта или /uploads/… из библиотеки), поэтому
    проверяются той же safeMedia(), что и фото модели, а не safeUrl(). */
 const MEDIA_KEYS = new Set(['hero_photo', 'about_photo', 'manager_photo'])
-
-/** Ссылку принимаем только пустую или явный https:// — прочее (в т.ч.
-    javascript:, data:, http://) отбрасываем в пустую строку. */
-const safeUrl = (v) => (/^https:\/\/\S+$/i.test(v) ? v : '')
 
 export const settings = {
   /** Публичные настройки — без пароля админки. */

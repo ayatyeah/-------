@@ -45,6 +45,9 @@ export const api = {
   news: (limit) => request(`/news${limit ? `?limit=${limit}` : ''}`),
   article: (id) => request(`/news/${id}`),
 
+  /** Сервисные центры — адрес и телефон конкретных точек обслуживания. */
+  serviceCenters: () => request('/service-centers'),
+
   createRequest: (body) => request('/requests', { method: 'POST', body }),
 
   /** Маячок визита — раз за вкладку браузера, см. src/App.jsx. */
@@ -134,6 +137,13 @@ export const api = {
     updateCert: (id, body) => request(`/certs/${id}`, { method: 'PUT', body, auth: true }),
     deleteCert: (id) => request(`/certs/${id}`, { method: 'DELETE', auth: true }),
     reorderCerts: (ids) => request('/certs/reorder', { method: 'POST', body: { ids }, auth: true }),
+
+    createServiceCenter: (body) => request('/service-centers', { method: 'POST', body, auth: true }),
+    updateServiceCenter: (id, body) =>
+      request(`/service-centers/${id}`, { method: 'PUT', body, auth: true }),
+    deleteServiceCenter: (id) => request(`/service-centers/${id}`, { method: 'DELETE', auth: true }),
+    reorderServiceCenters: (ids) =>
+      request('/service-centers/reorder', { method: 'POST', body: { ids }, auth: true }),
 
     saveRegions: (regions) => request('/regions', { method: 'PUT', body: { regions }, auth: true }),
 
