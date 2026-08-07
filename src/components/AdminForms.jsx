@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api'
 import { Dialog } from './ui'
 import MediaPicker, { GalleryPicker } from './MediaPicker'
 
@@ -136,9 +137,35 @@ export function ModelForm({ model, cats, onSave, onClose }) {
   const [specs, setSpecs] = useState(model?.specs ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [generating, setGenerating] = useState(false)
 
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const updTestimonial = (k, v) => setF((p) => ({ ...p, testimonial: { ...p.testimonial, [k]: v } }))
+
+  /* AI-описание по названию, категории и уже заполненным характеристикам
+     (задача 8) — тот же ИИ-слой, что у анализатора лидов и импорта
+     каталога: сначала OpenAI, недоступен — Gemini, ничего не настроено
+     специально под эту кнопку. Заполненные вручную тексты не трогаем без
+     подтверждения — переписать чужую работу молча нельзя. */
+  async function generateDescription() {
+    if ((f.short || f.descr) && !confirm('Заменить уже введённое краткое и полное описание?')) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const res = await api.admin.generateModelDescription({
+        name: f.name,
+        cat: f.cat,
+        specs,
+        subsidized: f.subsidized,
+      })
+      upd('short', res.short)
+      upd('descr', res.descr)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -193,6 +220,18 @@ export function ModelForm({ model, cats, onSave, onClose }) {
           onChange={(list) => setF((p) => ({ ...p, photo: list[0] || '', gallery: list.slice(1) }))}
           label="Фотографии модели"
         />
+
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={generateDescription}
+            disabled={generating || !f.name.trim()}
+            title={!f.name.trim() ? 'Сначала укажите название модели' : 'Составит краткое и полное описание по названию, категории и характеристикам'}
+          >
+            {generating ? 'Составляю…' : '✨ Сформировать описание (ИИ)'}
+          </button>
+        </div>
 
         <div className="field">
           <label htmlFor="m_short">Краткое описание</label>

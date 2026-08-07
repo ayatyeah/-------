@@ -99,6 +99,10 @@ export const api = {
     catalogImportCommit: (items) =>
       request('/admin/catalog-import/commit', { method: 'POST', body: { items }, auth: true }),
 
+    /** AI-описание модели по названию/категории/характеристикам. */
+    generateModelDescription: (body) =>
+      request('/admin/models/generate-description', { method: 'POST', body, auth: true }),
+
     news: () => request('/news?all=1', { auth: true }),
     createNews: (body) => request('/news', { method: 'POST', body, auth: true }),
     updateNews: (id, body) => request(`/news/${id}`, { method: 'PUT', body, auth: true }),

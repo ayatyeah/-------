@@ -794,6 +794,34 @@ app.post('/api/admin/catalog-import/commit', requireAdmin, limitAdminWrite, wrap
   res.json({ created, failed })
 }))
 
+/* AI-описание модели по названию, категории и характеристикам (задача 8) —
+   кнопка в форме модели. Те же провайдер, кэш нужны не так остро (запрос
+   разовый и короткий), поэтому просто идёт через общий бюджет. */
+app.post('/api/admin/models/generate-description', requireAdmin, limitAnalyze, wrap(async (req, res) => {
+  if (aiBudgetLeft() <= 0) {
+    return res.status(429).json({
+      error: 'Суточный лимит обращений к ИИ исчерпан. Попробуйте завтра.',
+    })
+  }
+  const name = clean(req.body?.name, 200)
+  if (!name) return res.status(400).json({ error: 'Сначала укажите название модели' })
+
+  const cat = req.body?.cat ? store.categories.get(req.body.cat) : null
+  const specs = Array.isArray(req.body?.specs)
+    ? req.body.specs.slice(0, 60).map((s) => ({ k: clean(s?.k, 120), v: clean(s?.v, 240) }))
+    : []
+
+  aiBudgetTake()
+  const result = await ai.generateModelDescription({
+    name,
+    catName: cat?.name || '',
+    specs,
+    subsidized: !!req.body?.subsidized,
+  })
+  if (result.error) return res.status(422).json({ error: result.error })
+  res.json(result)
+}))
+
 /* -------------------------------- новости ------------------------------ */
 
 app.get('/api/news', wrap((req, res) => {

@@ -956,3 +956,66 @@ export async function importCatalog(text) {
 
   return { items, overview: String(parsed.overview || ''), engine: res.engine }
 }
+
+/* ======================================================================
+   4. AI-ОПИСАНИЕ МОДЕЛИ (задача 8)
+   ====================================================================== */
+
+const DESCRIPTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    short: { type: 'string', description: 'Одно предложение для карточки в каталоге, до 200 символов' },
+    descr: { type: 'string', description: 'Два-четыре предложения для страницы модели' },
+  },
+  required: ['short', 'descr'],
+}
+
+const DESCRIPTION_SYSTEM = `Ты пишешь тексты для каталога сайта ТОО «СХМ Агро» (производство и продажа сельхозтехники в Казахстане).
+
+По названию модели, категории и списку характеристик составь два текста:
+- short — одно ёмкое предложение для карточки в каталоге (что это за техника и для чего), без характеристик и цифр из списка внутри самого предложения, если это не ключевая цифра (например, мощность или ширина захвата).
+- descr — два-четыре предложения для страницы модели: назначение, для какого хозяйства подходит, что выделяет её среди аналогов. Характеристики из списка не перечисляй построчно — они и так показаны в таблице рядом, повторять их текстом незачем.
+
+Пиши по-русски, по-деловому, без рекламных превосходных степеней («лучший», «уникальный») и без выдуманных фактов, которых нет в присланных данных.`
+
+/** Составляет короткое и полное описание модели по названию, категории и
+    характеристикам — кнопка в форме модели в админке. Тот же провайдер и
+    бюджет, что у остальных ИИ-функций сайта. */
+export async function generateModelDescription({ name, catName, specs, subsidized }) {
+  if (!aiEnabled()) {
+    return { short: '', descr: '', engine: 'rules', error: 'ИИ сейчас недоступен' }
+  }
+
+  const specsText = (specs || [])
+    .filter((s) => s.k && s.v)
+    .map((s) => `- ${s.k}: ${s.v}`)
+    .join('\n')
+
+  const res = await ask({
+    label: `описание модели «${name}»`,
+    system: DESCRIPTION_SYSTEM,
+    schema: DESCRIPTION_SCHEMA,
+    maxTokens: 2000,
+    think: false,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Модель: ${name}\nКатегория: ${catName || '—'}\nСубсидируется: ${subsidized ? 'да' : 'нет'}\n\n` +
+          `Характеристики:\n${specsText || '(не указаны)'}\n\n` +
+          'Верни JSON по схеме.',
+      },
+    ],
+  })
+
+  const parsed = res && parseJson(res.text)
+  if (!parsed?.short && !parsed?.descr) {
+    return { short: '', descr: '', engine: res?.engine || 'ошибка', error: 'Не удалось составить описание' }
+  }
+
+  return {
+    short: String(parsed.short || '').slice(0, 400),
+    descr: String(parsed.descr || '').slice(0, 8000),
+    engine: res.engine,
+  }
+}
