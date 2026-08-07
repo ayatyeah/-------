@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import Link from '../components/L'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media } from '../components/ui'
@@ -38,16 +39,15 @@ function HeroTitle({ text }) {
 }
 
 export default function Home() {
+  const { t, td, fdate, lang, tField, withLang } = useT()
   usePageMeta({
     // Совпадает с серверной версией (server/seo.js): робот без JS и браузер
     // после гидратации должны видеть один и тот же title.
-    fullTitle: 'СХМ Агро — сельхозтехника от производителя в Казахстане',
-    description:
-      'СХМ Агро — казахстанский завод сельхозтехники. Купить трактор, комбайн, сеялку или посевной комплекс напрямую у производителя: цены без посредников, гарантия 2 года, 34 сервисных центра, лизинг и субсидии.',
+    fullTitle: t('home_meta_title'),
+    description: t('home_meta_desc'),
   })
   // Все данные главной приходят одним запросом /api/home из провайдера.
   const { settings, home, openKP } = useSite()
-  const { t, td, fdate, lang, tField } = useT()
   const navigate = useNavigate()
   const [cert, setCert] = useState(null)
   const tiltRef = useTilt(9)
@@ -87,7 +87,7 @@ export default function Home() {
               <button
                 type="button"
                 className="btn btn-brass btn-lg"
-                onClick={() => navigate('/catalog')}
+                onClick={() => navigate(withLang('/catalog'))}
               >
                 {t('hero_catalog')}
               </button>

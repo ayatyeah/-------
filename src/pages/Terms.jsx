@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from '../components/L'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
@@ -18,8 +18,8 @@ const TERMS_DATE = '24 июля 2026 года'
 export default function Terms() {
   const { lang, t } = useT()
   usePageMeta({
-    title: 'Условия использования',
-    description: 'На каких условиях работает сайт ТОО «СХМ Агро».',
+    title: t('terms_meta_title'),
+    description: t('terms_meta_desc'),
   })
   const { settings } = useSite()
   const company = settings.legal_name || 'ТОО «СХМ Агро»'

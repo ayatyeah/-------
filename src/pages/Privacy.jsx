@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from '../components/L'
 import { useSite } from '../store'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
@@ -18,8 +18,8 @@ const PRIVACY_DATE = '24 июля 2026 года'
 export default function Privacy() {
   const { lang, t } = useT()
   usePageMeta({
-    title: 'Политика конфиденциальности',
-    description: 'Как ТОО «СХМ Агро» обрабатывает персональные данные, оставленные на сайте.',
+    title: t('privacy_meta_title'),
+    description: t('privacy_meta_desc'),
   })
   const { settings } = useSite()
 

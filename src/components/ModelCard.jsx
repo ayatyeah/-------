@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from './L'
 import { Media } from './ui'
 import Reveal from './Reveal'
 import { useSite } from '../store'

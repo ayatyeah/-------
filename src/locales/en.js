@@ -259,6 +259,26 @@ export default {
     footer_privacy: 'Privacy policy',
     footer_terms: 'Terms of use',
 
+    home_meta_title: 'SHM Agro — Farm Machinery Manufacturer in Kazakhstan',
+    home_meta_desc:
+      'SHM Agro is a Kazakhstani farm machinery plant. Buy tractors, combine harvesters, seeders or planting complexes directly from the manufacturer: no middleman markup, 2-year warranty, 34 service centers, leasing and subsidies.',
+    catalog_meta_title: 'Farm Machinery Catalog — Tractors, Combines, Seeders',
+    catalog_meta_desc:
+      'SHM Agro equipment catalog: tractors, grain combine harvesters, seeders, planting complexes and disc harrows. Specifications, availability, leasing and subsidies. Buy directly from the manufacturer in Kazakhstan.',
+    about_meta_title: 'About the Plant — Farm Machinery Manufacturing in Kazakhstan',
+    about_meta_desc:
+      'In-house farm machinery manufacturing in Kazakhstan: we cast components, assemble, paint and test-run machines on our own proving ground. SHM Agro — machinery built for the steppe.',
+    news_meta_title: 'Farm Machinery News and Articles',
+    news_meta_desc:
+      'News from SHM Agro plant, farm machinery lineup updates, subsidy and leasing guides for farmers in Kazakhstan.',
+    contacts_meta_title: 'Farm Machinery Plant Contacts',
+    contacts_meta_lead: 'Buy SHM Agro farm machinery',
+    contacts_meta_tail: "Leave a request — we'll call you back during business hours.",
+    privacy_meta_title: 'Privacy Policy',
+    privacy_meta_desc: "How the SHM Agro website processes and protects visitors' personal data.",
+    terms_meta_title: 'Terms of Use',
+    terms_meta_desc: 'Terms of use for the SHM Agro LLP website.',
+
     about_title: '18 years building machinery for Kazakh farms',
     about_img_alt: 'SHM tractor at the pre-delivery preparation site',
     about_p1:

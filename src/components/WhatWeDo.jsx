@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from './L'
 import Icon from './Icon'
 import Reveal from './Reveal'
 import { useT } from '../i18n'

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import Link, { NavLink } from './L'
 import { useSite } from '../store'
 import { useScrolled } from '../hooks/useMotion'
 import Icon from './Icon'

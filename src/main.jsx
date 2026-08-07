@@ -8,10 +8,10 @@ import './styles.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <I18nProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <I18nProvider>
         <App />
-      </BrowserRouter>
-    </I18nProvider>
+      </I18nProvider>
+    </BrowserRouter>
   </React.StrictMode>
 )

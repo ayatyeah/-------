@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import Link from '../components/L'
 import { useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media } from '../components/ui'
@@ -10,14 +10,13 @@ import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
 
 export default function About() {
+  const { t, td } = useT()
   usePageMeta({
-    title: 'О заводе — производство сельхозтехники в Казахстане',
-    description:
-      'Собственное производство сельхозтехники в Казахстане: льём узлы, собираем, красим и обкатываем машины на своём полигоне. Завод СХМ Агро — техника, рассчитанная на степь.',
+    title: t('about_meta_title'),
+    description: t('about_meta_desc'),
   })
   // Показатели и сертификаты уже загружены провайдером — второй запрос не нужен.
   const { settings, home, openCall } = useSite()
-  const { t, td } = useT()
   const tiltRef = useTilt(8)
   const stats = home?.stats ?? []
   const certs = home?.certs ?? []

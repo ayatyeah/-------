@@ -10,7 +10,7 @@ import { useT } from '../i18n'
 export default function Article() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { t, fdate, tField, tParas } = useT()
+  const { t, fdate, tField, tParas, withLang } = useT()
   const { data: a, loading, error, reload } = useFetch(() => api.article(id), [id])
   const aTitle = a ? tField(a, 'title') : ''
   const aBody = a ? tParas(a, 'body') : []
@@ -41,7 +41,7 @@ export default function Article() {
       <main className="wrap">
         <ErrorState message={error} onRetry={reload} />
         <div style={{ textAlign: 'center', paddingBottom: 60 }}>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/news')}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(withLang('/news'))}>
             {t('back_news')}
           </button>
         </div>
@@ -52,7 +52,7 @@ export default function Article() {
   return (
     <main className="wrap route-fade" style={{ paddingBlock: '36px 72px' }}>
       <div className="article-head">
-        <button type="button" className="back-link" onClick={() => navigate('/news')}>
+        <button type="button" className="back-link" onClick={() => navigate(withLang('/news'))}>
           {t('back_news')}
         </button>
         <span className="card-meta">{fdate(a.date)}</span>
@@ -74,7 +74,7 @@ export default function Article() {
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 48 }}>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/news')}>
+        <button type="button" className="btn btn-secondary" onClick={() => navigate(withLang('/news'))}>
           {t('back_news')}
         </button>
       </div>

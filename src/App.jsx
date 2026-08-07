@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
+import Link from './components/L'
 import { SiteProvider, useSite } from './store'
 import { api } from './api'
 import { captureAttribution } from './lib/attribution'
@@ -26,6 +27,24 @@ import { useT } from './i18n'
 // Админку грузим отдельным чанком: посетителям сайта она не нужна,
 // а весит она больше любой публичной страницы.
 const Admin = lazy(() => import('./pages/Admin'))
+
+/* Публичные страницы (задача 17). Русский — без префикса (язык по
+   умолчанию), казахский и английский — с /kk и /en: тот же набор адресов
+   регистрируется трижды, чтобы у каждого языка были свои, отдельно
+   индексируемые URL (см. src/i18n.jsx, server/seo.js). Админка сюда не
+   входит — у неё нет и не будет языковых версий. */
+const PAGE_ROUTES = [
+  { path: '/', element: <Home /> },
+  { path: '/about', element: <About /> },
+  { path: '/catalog', element: <Catalog /> },
+  { path: '/catalog/:id', element: <ModelPage /> },
+  { path: '/news', element: <News /> },
+  { path: '/news/:id', element: <Article /> },
+  { path: '/contacts', element: <Contacts /> },
+  { path: '/privacy', element: <Privacy /> },
+  { path: '/terms', element: <Terms /> },
+]
+const LANG_PREFIXES = ['kk', 'en']
 
 function NotFound() {
   const { t } = useT()
@@ -97,15 +116,18 @@ function Shell() {
 
       <div id="main">
         <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/catalog" element={<Catalog />} />
-        <Route path="/catalog/:id" element={<ModelPage />} />
-        <Route path="/news" element={<News />} />
-        <Route path="/news/:id" element={<Article />} />
-        <Route path="/contacts" element={<Contacts />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
+        {PAGE_ROUTES.map(({ path, element }) => (
+          <Route key={path} path={path} element={element} />
+        ))}
+        {LANG_PREFIXES.flatMap((lang) =>
+          PAGE_ROUTES.map(({ path, element }) => (
+            <Route
+              key={`${lang}${path}`}
+              path={path === '/' ? `/${lang}` : `/${lang}${path}`}
+              element={element}
+            />
+          ))
+        )}
         <Route
           path="/admin"
           element={

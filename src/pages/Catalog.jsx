@@ -10,12 +10,11 @@ import { useT } from '../i18n'
 import { buildFacets, matchesFacets, matchesQuery } from '../lib/catalogFilters'
 
 export default function Catalog() {
-  usePageMeta({
-    title: 'Каталог сельхозтехники — купить трактор, комбайн, сеялку',
-    description:
-      'Каталог агротехники завода СХМ Агро: тракторы, зерноуборочные комбайны, сеялки, посевные комплексы и бороны. Характеристики, наличие, лизинг и субсидии. Купить напрямую у производителя в Казахстане.',
-  })
   const { t, td } = useT()
+  usePageMeta({
+    title: t('catalog_meta_title'),
+    description: t('catalog_meta_desc'),
+  })
   const [params, setParams] = useSearchParams()
   const cat = params.get('cat') || 'all'
 

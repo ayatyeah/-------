@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from '../components/L'
 import { api } from '../api'
 import { useFetch } from '../store'
 import { Media, Loading, ErrorState, EmptyState } from '../components/ui'
@@ -7,12 +7,11 @@ import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
 
 export default function News() {
-  usePageMeta({
-    title: 'Новости и статьи о сельхозтехнике',
-    description:
-      'Новости завода СХМ Агро, обновления модельного ряда сельхозтехники, разборы по субсидиям и лизингу для аграриев Казахстана.',
-  })
   const { t, fdate, tField } = useT()
+  usePageMeta({
+    title: t('news_meta_title'),
+    description: t('news_meta_desc'),
+  })
   const { data, loading, error, reload } = useFetch(() => api.news(), [])
   const items = data ?? []
 

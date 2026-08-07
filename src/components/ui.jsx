@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import Link from './L'
 import { useT } from '../i18n'
 
 /** Плашка вместо фотографии — штриховка с подписью. */

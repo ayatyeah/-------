@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ru from './locales/ru'
 import kk from './locales/kk'
 import en from './locales/en'
@@ -12,14 +13,18 @@ import en from './locales/en'
  *  - t('key')   — интерфейс: кнопки, заголовки, подписи. Ключи — в словарях
  *    src/locales/*, русский — источник истины и запасной вариант.
  *  - td('Текст') — данные из админки (категории, услуги, показатели,
- *    характеристики). Админ пишет по-русски; словарь data сопоставляет
- *    известные строки с переводом ЦЕЛИКОМ, по точному совпадению. Если
- *    заказчик ввёл что-то новое — строка показывается по-русски, а не
- *    ломается. Это честный компромисс: контент из админки одноязычный,
- *    и до появления полей «на трёх языках» лучше русский текст, чем пустота.
+ *    характеристики), переводимые по точному совпадению строки целиком.
+ *  - tField(obj, 'name') / tParas(obj, 'body') — переводные поля моделей и
+ *    новостей (задача 16): `field_kk`/`field_en`, если заполнены, иначе
+ *    русский оригинал.
  *
- * Выбор языка хранится в localStorage и живёт между визитами. Русский —
- * язык по умолчанию.
+ * Язык — часть адреса (задача 17), а не скрытое состояние: русский без
+ * префикса (/catalog/…), казахский и английский — с /kk и /en (/kk/catalog/…,
+ * /en/catalog/…). Так поисковик индексирует каждый язык отдельной страницей
+ * и может показать нужную версию по hreflang (см. server/seo.js), а сервер
+ * при отдаче HTML знает, какой язык рисовать, — раньше выбор жил только в
+ * localStorage браузера, и краулер видел один и тот же русский текст
+ * независимо от того, что выбрал живой посетитель.
  */
 
 const DICTS = { ru, kk, en }
@@ -30,39 +35,66 @@ export const LANGS = [
   { code: 'en', label: 'Eng' },
 ]
 
-const KEY = 'shm_lang'
+/* Префикс адреса на язык. У русского префикса нет — он язык по умолчанию,
+   и /catalog остаётся /catalog, а не /ru/catalog. */
+const PREFIX = { kk: '/kk', en: '/en' }
+
 const LOCALE = { ru: 'ru-RU', kk: 'kk-KZ', en: 'en-GB' }
+
+/** «/kk/catalog/t2204» → 'kk'. Без префикса или незнакомый — русский. */
+export function langFromPath(pathname) {
+  if (pathname === '/kk' || pathname.startsWith('/kk/')) return 'kk'
+  if (pathname === '/en' || pathname.startsWith('/en/')) return 'en'
+  return 'ru'
+}
+
+/** Тот же адрес без языкового префикса: «/kk/catalog» → «/catalog». */
+export function stripLangPrefix(pathname) {
+  const lang = langFromPath(pathname)
+  if (lang === 'ru') return pathname
+  const rest = pathname.slice(PREFIX[lang].length)
+  return rest || '/'
+}
+
+/**
+ * Внутренняя ссылка с текущим языковым префиксом: withLang('kk', '/catalog')
+ * → '/kk/catalog'. Админка не локализуется — у нас нет и не планируется
+ * её перевод, а «/kk/admin» выглядело бы как настоящая, но битая страница.
+ */
+export function withLang(lang, path) {
+  if (typeof path !== 'string' || !path.startsWith('/')) return path
+  if (path === '/admin' || path.startsWith('/admin/')) return path
+  const prefix = PREFIX[lang]
+  if (!prefix) return path
+  return path === '/' ? prefix : `${prefix}${path}`
+}
 
 const I18nContext = createContext(null)
 
 export function I18nProvider({ children }) {
-  const [lang, setLangState] = useState(() => {
-    try {
-      const v = localStorage.getItem(KEY)
-      if (v && DICTS[v]) return v
-    } catch {
-      /* приватный режим — работаем с языком по умолчанию */
-    }
-    return 'ru'
-  })
+  const location = useLocation()
+  const navigate = useNavigate()
+  const lang = langFromPath(location.pathname)
 
-  // <html lang> — для читалок экрана и поисковика.
+  // <html lang> — для читалок экрана и поисковика. На отданном сервером
+  // HTML этот же атрибут уже верный (см. server/seo.js) — здесь только
+  // поддерживаем его в переходах внутри SPA, без перезагрузки.
   useEffect(() => {
     document.documentElement.lang = lang
   }, [lang])
 
-  const setLang = (code) => {
-    if (!DICTS[code]) return
-    setLangState(code)
-    try {
-      localStorage.setItem(KEY, code)
-    } catch {
-      /* ок: выбор проживёт до перезагрузки */
-    }
-  }
-
   const value = useMemo(() => {
     const dict = DICTS[lang]
+
+    /* Переключение языка — это переход на тот же маршрут под другим
+       префиксом, а не смена скрытого состояния: адрес остаётся источником
+       истины и для сервера, и для истории браузера (кнопка «назад» работает
+       правильно), и для поисковика. */
+    const setLang = (code) => {
+      if (!DICTS[code]) return
+      const bare = stripLangPrefix(location.pathname)
+      navigate(`${withLang(code, bare)}${location.search}${location.hash}`)
+    }
 
     /** Строка интерфейса по ключу. Нет перевода — русский; нет ключа — сам ключ. */
     const t = (key) => dict.ui[key] ?? DICTS.ru.ui[key] ?? key
@@ -108,8 +140,19 @@ export function I18nProvider({ children }) {
       return `${n} ${n === 1 ? 'model' : 'models'}`
     }
 
-    return { lang, setLang, t, td, tField, tParas, fdate, tModels }
-  }, [lang])
+    return {
+      lang,
+      setLang,
+      t,
+      td,
+      tField,
+      tParas,
+      fdate,
+      tModels,
+      /** Внутренняя ссылка с текущим языковым префиксом — см. withLang() выше. */
+      withLang: (path) => withLang(lang, path),
+    }
+  }, [lang, location.pathname, location.search, location.hash, navigate])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }

@@ -128,13 +128,12 @@ function ServiceCenters() {
 }
 
 export default function Contacts() {
-  usePageMeta({
-    title: 'Контакты завода сельхозтехники',
-    description:
-      'Адрес, телефон и почта ТОО «СХМ Агро» — купить сельхозтехнику в Казахстане. Оставьте заявку — перезвоним в рабочее время.',
-  })
   const { settings, showToast, openCall } = useSite()
   const { t } = useT()
+  usePageMeta({
+    title: t('contacts_meta_title'),
+    description: `${t('contacts_meta_lead')}: ${[settings.phone, settings.email, settings.address].filter(Boolean).join(', ')}. ${t('contacts_meta_tail')}`,
+  })
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [consent, setConsent] = useState(false)

@@ -25,9 +25,9 @@ export default function ModelPage() {
      поиска или по присланной ссылке, и «назад» уводил бы с сайта вовсе. */
   const [params] = useSearchParams()
   const catBack = params.get('cat')
-  const backToCatalog = () => navigate(catBack ? `/catalog?cat=${catBack}` : '/catalog')
   const { settings, openKP, openCall } = useSite()
-  const { t, td, tField } = useT()
+  const { t, td, tField, withLang } = useT()
+  const backToCatalog = () => navigate(withLang(catBack ? `/catalog?cat=${catBack}` : '/catalog'))
   const tiltRef = useTilt(7)
   const { data: m, loading, error, reload } = useFetch(() => api.model(id), [id])
   const mName = m ? tField(m, 'name') : ''

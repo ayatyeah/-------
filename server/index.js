@@ -1369,6 +1369,16 @@ app.get('/robots.txt', wrap((req, res) => {
   )
 }))
 
+/* Языковой префикс адреса (задача 17) — тот же принцип, что и в
+   server/seo.js и src/i18n.jsx: русский без префикса, остальные — с /kk
+   и /en. Здесь не импортируем seo.js ради одной функции — она в три строки. */
+const SITEMAP_LANGS = ['ru', 'kk', 'en']
+const sitemapLangPath = (lang, path) => {
+  if (lang === 'ru') return path
+  const prefix = lang === 'kk' ? '/kk' : '/en'
+  return path === '/' ? prefix : `${prefix}${path}`
+}
+
 app.get('/sitemap.xml', wrap((req, res) => {
   const origin = siteOrigin(req)
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1392,18 +1402,29 @@ app.get('/sitemap.xml', wrap((req, res) => {
     })),
   ]
 
+  /* Каждая страница — тремя записями (ru/kk/en), и в каждой —
+     xhtml:link на все языковые версии плюс x-default. Это тот же
+     hreflang, что и в <head> самой страницы (server/seo.js), только в
+     формате, который понимает индексатор карты сайта. */
   const body = pages
-    .map(
-      (p) =>
-        `  <url><loc>${esc(origin + p.loc)}</loc>` +
-        (p.lastmod ? `<lastmod>${esc(p.lastmod)}</lastmod>` : '') +
-        `<changefreq>${p.freq}</changefreq><priority>${p.priority}</priority></url>`
+    .flatMap((p) =>
+      SITEMAP_LANGS.map((lang) => {
+        const alternates =
+          SITEMAP_LANGS.map(
+            (l) => `<xhtml:link rel="alternate" hreflang="${l}" href="${esc(origin + sitemapLangPath(l, p.loc))}" />`
+          ).join('') + `<xhtml:link rel="alternate" hreflang="x-default" href="${esc(origin + p.loc)}" />`
+        return (
+          `  <url><loc>${esc(origin + sitemapLangPath(lang, p.loc))}</loc>` +
+          (p.lastmod ? `<lastmod>${esc(p.lastmod)}</lastmod>` : '') +
+          `<changefreq>${p.freq}</changefreq><priority>${p.priority}</priority>${alternates}</url>`
+        )
+      })
     )
     .join('\n')
 
   res.type('application/xml').send(
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${body}\n</urlset>\n`
   )
 }))
 
@@ -1534,22 +1555,28 @@ const KNOWN_PATHS = new Set([
 ])
 /* Карточки и статьи сверяем с данными: раньше любой /catalog/что-угодно
    получал 200 (soft-404) — с точки зрения поисковика это тысячи «настоящих»
-   пустых страниц. Теперь несуществующий id честно отвечает 404. */
+   пустых страниц. Теперь несуществующий id честно отвечает 404.
+
+   Языковой префикс (/kk, /en — задача 17) снимаем перед проверкой: сам
+   набор маршрутов одинаков на всех трёх языках, а /admin языковых версий
+   не имеет вовсе, поэтому его снимаем только у остального. */
 const isKnownRoute = (p) => {
-  if (KNOWN_PATHS.has(p)) return true
+  const bare = p === '/kk' || p === '/en' ? '/' : p.startsWith('/kk/') ? p.slice(3) : p.startsWith('/en/') ? p.slice(3) : p
+  if (bare === '/admin' && bare !== p) return false // /kk/admin, /en/admin — не существуют
+  if (KNOWN_PATHS.has(bare)) return true
   // Кривой процент-энкодинг (/catalog/%zz) не должен ронять запрос в 500.
   const tail = (pre) => {
     try {
-      return decodeURIComponent(p.slice(pre.length).replace(/\/+$/, ''))
+      return decodeURIComponent(bare.slice(pre.length).replace(/\/+$/, ''))
     } catch {
       return ''
     }
   }
-  if (p.startsWith('/catalog/') && p.length > '/catalog/'.length) {
+  if (bare.startsWith('/catalog/') && bare.length > '/catalog/'.length) {
     const m = store.models.get(tail('/catalog/'))
     return !!(m && m.published !== false)
   }
-  if (p.startsWith('/news/') && p.length > '/news/'.length) {
+  if (bare.startsWith('/news/') && bare.length > '/news/'.length) {
     const n = store.news.get(tail('/news/'))
     return !!(n && n.published !== false)
   }
