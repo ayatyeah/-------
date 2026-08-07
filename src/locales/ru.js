@@ -19,6 +19,7 @@ export default {
 
     // Общие
     call_order: 'Заказать звонок',
+    whatsapp_chat: 'Написать в WhatsApp',
     cancel: 'Отмена',
     sending: 'Отправляем…',
     send: 'Отправить',

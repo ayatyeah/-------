@@ -2047,7 +2047,8 @@ select.input {
   pointer-events: none;
 }
 
-.float-call {
+.float-call,
+.float-whatsapp {
   box-shadow: var(--shadow-lg);
   border-radius: var(--r-pill);
   padding: 12px 20px;
@@ -4913,6 +4914,7 @@ select.input {
   }
 
   .float-call,
+  .float-whatsapp,
   .ai-fab {
     width: 50px;
     height: 50px;
@@ -4921,6 +4923,7 @@ select.input {
   }
 
   .float-call span,
+  .float-whatsapp span,
   .ai-fab-label {
     display: none;
   }

@@ -13,6 +13,7 @@ export default {
     get_kp: 'КП алу',
 
     call_order: 'Қоңырауға тапсырыс беру',
+    whatsapp_chat: 'WhatsApp-қа жазу',
     cancel: 'Болдырмау',
     sending: 'Жіберілуде…',
     send: 'Жіберу',

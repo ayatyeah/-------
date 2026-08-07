@@ -13,6 +13,7 @@ export default {
     get_kp: 'Get a quote',
 
     call_order: 'Request a call',
+    whatsapp_chat: 'Message on WhatsApp',
     cancel: 'Cancel',
     sending: 'Sending…',
     send: 'Send',

@@ -59,7 +59,7 @@ function ScrollTop() {
 
 function Shell() {
   const { pathname } = useLocation()
-  const { openCall } = useSite()
+  const { settings, openCall } = useSite()
   const { t } = useT()
   const isAdmin = pathname.startsWith('/admin')
   // Пока листают вниз — прячем стопку, чтобы не закрывала текст.
@@ -133,6 +133,20 @@ function Shell() {
       {!isAdmin && (
         <div className={`float-stack${stackHidden ? ' is-hidden' : ''}`}>
           <AiChat />
+          {/* Значок появляется только когда ссылка задана в админке — та же
+              логика, что и у соцсетей в подвале (см. Footer.jsx). */}
+          {settings.whatsapp_url && (
+            <a
+              href={settings.whatsapp_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary float-whatsapp"
+              aria-label={t('whatsapp_chat')}
+            >
+              <Icon name="whatsapp" size={18} />
+              <span>{t('whatsapp_chat')}</span>
+            </a>
+          )}
           <button
             type="button"
             className="btn btn-brass float-call"
