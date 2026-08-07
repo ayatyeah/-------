@@ -610,6 +610,7 @@ async function syncKv(client, data, full) {
   const items = [
     ['regions', data.regions || []],
     ['auth', data.auth || {}],
+    ['aiBudget', data.aiBudget || { day: '', used: 0 }],
   ]
   const prev = sent.get('kv') || new Map()
   const now = new Map()
@@ -774,6 +775,8 @@ async function readAll() {
   const kvMap = Object.fromEntries(kv.rows.map((r) => [r.key, r.value]))
   d.regions = Array.isArray(kvMap.regions) ? kvMap.regions : []
   d.auth = kvMap.auth && typeof kvMap.auth === 'object' ? kvMap.auth : {}
+  d.aiBudget =
+    kvMap.aiBudget && typeof kvMap.aiBudget === 'object' ? kvMap.aiBudget : { day: '', used: 0 }
 
   return d
 }

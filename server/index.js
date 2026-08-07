@@ -258,21 +258,11 @@ const limitUpload = rateLimit({
  * работать на правилах, без ИИ. Сайт не ломается, счёт не растёт.
  */
 const AI_DAILY_MAX = Number(process.env.AI_DAILY_LIMIT || 500)
-let aiDay = ''
-let aiUsedToday = 0
 
-function aiBudgetLeft() {
-  const day = new Date().toISOString().slice(0, 10)
-  if (day !== aiDay) {
-    aiDay = day
-    aiUsedToday = 0
-  }
-  return AI_DAILY_MAX - aiUsedToday
-}
-const aiBudgetTake = () => {
-  aiBudgetLeft()
-  aiUsedToday += 1
-}
+/* Сам счётчик расхода — в store.aiBudget (данные, переживают перезапуск и
+   деплой, см. store.js). Здесь только потолок из окружения. */
+const aiBudgetLeft = () => AI_DAILY_MAX - store.aiBudget.usedToday()
+const aiBudgetTake = () => store.aiBudget.take()
 
 /* Общий лимит вешаем на всё дерево /api до объявления маршрутов —
    так под ним оказывается и то, что появится позже. */
