@@ -190,6 +190,16 @@ export default function ModelPage() {
             <button type="button" className="btn btn-secondary" onClick={openCall}>
               {t('call_order')}
             </button>
+            {m.specs.length > 0 && (
+              <a
+                href={`/api/models/${m.id}/sheet.pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost"
+              >
+                {t('model_pdf')}
+              </a>
+            )}
           </div>
 
           {m.specs.length > 0 && (

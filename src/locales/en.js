@@ -158,6 +158,7 @@ export default {
     model_subsidy: 'Included in the state support list —',
     subsidy_check: 'check on GosAgro →',
     model_kp: 'Request a commercial quote',
+    model_pdf: 'Download specs (PDF)',
     specs_title: 'Technical specifications',
     flagship: 'Flagship model',
     badge_new: 'New',

@@ -26,6 +26,7 @@ import { notifyNewRequest, notifyText } from './notify.js'
 import { PRIVACY_VERSION } from '../shared/constants.js'
 import ExcelJS from 'exceljs'
 import { extractText, detectExt } from './catalog-import.js'
+import { streamModelSheet } from './pdf.js'
 
 const { seeded, recovered } = store.load()
 
@@ -698,6 +699,19 @@ app.get('/api/models/:id', wrap((req, res) => {
     return res.status(404).json({ error: 'Модель не найдена' })
   }
   res.json(m)
+}))
+
+/** PDF-листовка с характеристиками (п.15) — та же видимость, что и у карточки:
+    черновик отдаётся только администратору. */
+app.get('/api/models/:id/sheet.pdf', wrap((req, res) => {
+  const m = store.models.get(req.params.id)
+  if (!m) return res.status(404).json({ error: 'Модель не найдена' })
+  if (!m.published && !isAdmin(req)) {
+    return res.status(404).json({ error: 'Модель не найдена' })
+  }
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `inline; filename="${store.slugify(m.name, 'model')}.pdf"`)
+  streamModelSheet(res, m, store.settings.publicAll())
 }))
 
 app.post('/api/models', requireAdmin, limitAdminWrite, wrap((req, res) => {
