@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useFetch, useSite } from '../store'
 import { useTilt } from '../hooks/useMotion'
 import { Media, ErrorState } from '../components/ui'
+import PhotoLightbox from '../components/PhotoLightbox'
 import Reveal from '../components/Reveal'
 import usePageMeta from '../hooks/usePageMeta'
 import { useT } from '../i18n'
@@ -36,6 +37,9 @@ export default function ModelPage() {
   const [shown, setShown] = useState(null)
   useEffect(() => setShown(null), [id])
   const active = shown && photos.includes(shown) ? shown : photos[0]
+
+  // Лайтбокс открывается на том фото, что сейчас показано крупно.
+  const [lightbox, setLightbox] = useState(false)
 
   // Пока модель грузится — общий заголовок; загрузилась — её имя и краткое
   // описание. Ошибка/не найдено закрываем от индексации.
@@ -92,9 +96,25 @@ export default function ModelPage() {
       <div className="model-layout">
         <div>
           <Reveal variant="clip">
-            <figure className="model-hero tilt" ref={tiltRef}>
-              <Media src={active} alt={m.name} stub={`${m.name} · ${t('photo')}`} priority />
-            </figure>
+            <button
+              type="button"
+              className="model-hero-btn"
+              onClick={() => active && setLightbox(true)}
+              aria-label={t('photo_zoom_hint')}
+              disabled={!active}
+            >
+              <figure className="model-hero tilt" ref={tiltRef}>
+                <Media src={active} alt={m.name} stub={`${m.name} · ${t('photo')}`} priority />
+                {active && (
+                  <span className="model-hero-zoom-hint" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                )}
+              </figure>
+            </button>
           </Reveal>
           {/* Строка миниатюр — только когда есть что переключать: одно
               единственное фото под тем же фото ничего не добавляет. */}
@@ -161,6 +181,15 @@ export default function ModelPage() {
           )}
         </Reveal>
       </div>
+
+      {lightbox && (
+        <PhotoLightbox
+          photos={photos}
+          startIndex={photos.indexOf(active)}
+          alt={m.name}
+          onClose={() => setLightbox(false)}
+        />
+      )}
     </main>
   )
 }
