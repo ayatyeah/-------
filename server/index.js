@@ -35,6 +35,19 @@ const { seeded, recovered } = store.load()
    и всё, что накопилось в 150-мс окне отложенной записи, терялось. */
 store.startAutosave()
 
+/* Обезличивание давно закрытых заявок по сроку хранения (задача 20).
+   Раз в сутки достаточно — срок хранения считается в днях, а не в часах,
+   и гонять проверку по всей базе заявок чаще незачем. Разовый прогон сразу
+   при старте — на случай, если сервер несколько дней не перезапускался и
+   срок у части заявок уже наступил. */
+function runRetentionSweep() {
+  const n = store.requests.anonymizeStale()
+  if (n) console.log(`✓ Обезличено заявок по сроку хранения: ${n}`)
+}
+runRetentionSweep()
+const retentionTimer = setInterval(runRetentionSweep, 24 * 60 * 60 * 1000)
+retentionTimer.unref?.()
+
 const app = express()
 
 /* Доверие заголовку X-Forwarded-For — ТОЛЬКО когда сайт реально стоит за
@@ -1252,7 +1265,7 @@ app.post(
   requireAdmin,
   limitUpload,
   express.raw({ type: () => true, limit: uploads.MAX_FILE_BYTES }),
-  wrap((req, res) => {
+  wrap(async (req, res) => {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       return res.status(400).json({ error: 'Пустой файл' })
     }
@@ -1265,7 +1278,8 @@ app.post(
       original = ''
     }
 
-    const saved = uploads.saveImage(req.body, original)
+    // Пересжатие и снимок метаданных (задача 20) — см. server/uploads.js.
+    const saved = await uploads.saveImage(req.body, original)
     const entry = store.media.add({ ...saved, title: original.slice(0, 120) })
     res.status(201).json(entry)
   })

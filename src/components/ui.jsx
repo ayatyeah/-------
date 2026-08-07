@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from './L'
 import { useT } from '../i18n'
 
@@ -14,28 +14,39 @@ export function MediaStub({ label }) {
 /**
  * Картинка модели/новости или плашка, если фото нет.
  *
- * Для каждого снимка лежат две версии: `name.webp` (1200w) и `name-sm.webp`
- * (760w). Браузер выбирает подходящую по `sizes` — на телефоне грузится
- * мелкая, на десктопе крупная.
+ * Мелкая версия у снимка бывает по одной из двух причин:
+ *  - `/assets/…` — из комплекта сайта, там рядом с `name.webp` (1200w)
+ *    всегда лежит и `name-sm.webp` (760w), это готовится заранее;
+ *  - `/uploads/…` — загружено через админку, сервер сам собирает
+ *    уменьшенную версию `<файл>-sm.jpg` при загрузке (задача 20, см.
+ *    server/uploads.js). Формат превью всегда JPEG, даже если оригинал
+ *    PNG/WebP: это просто маленькая картинка для сетки карточек, точный
+ *    формат ей не нужен.
+ *
+ * Фото, загруженные ДО того как сервер начал делать превью, — исключение:
+ * уменьшенной версии у них нет. На такой случай — onError: если браузер
+ * не смог загрузить выбранный из srcSet файл, откатываемся на просто src
+ * (полноразмерный файл, он точно есть) вместо разбитой картинки.
  *
  * priority — для LCP-картинки (герой): грузим сразу, без lazy.
  */
 export function Media({ src, alt, stub, sizes = '(max-width: 720px) 100vw, 560px', priority = false }) {
+  // Сбрасываем при смене самого src — иначе после «не нашли уменьшенную
+  // версию у фото A» карточка с совсем другим фото B открылась бы сразу
+  // без srcSet, хотя у него уменьшенная версия есть.
+  const [smallFailed, setSmallFailed] = useState(false)
+  useEffect(() => setSmallFailed(false), [src])
+
   if (!src) return <MediaStub label={stub} />
 
-  /* Мелкая версия (`-sm.webp`) существует только у снимков из комплекта,
-     которые лежат в /assets. У загруженных через админку фотографий её
-     нет: сервер картинки не пережимает (это потребовало бы тяжёлой
-     библиотеки), их ужимает браузер при загрузке.
-
-     Раньше srcSet собирался для любого .webp — и для загруженного фото
-     браузер на телефоне честно шёл за несуществующим `-sm.webp`, получал
-     404 и показывал вместо карточки пустоту. Поэтому набор размеров
-     объявляем только там, где он действительно есть. */
-  const hasSmall = src.startsWith('/assets/') && src.endsWith('.webp')
-  const srcSet = hasSmall
-    ? `${src.replace(/\.webp$/, '-sm.webp')} 760w, ${src} 1200w`
-    : undefined
+  const isAsset = src.startsWith('/assets/') && src.endsWith('.webp')
+  const isUpload = src.startsWith('/uploads/') && /\.(jpe?g|png|webp)$/i.test(src)
+  const hasSmall = !smallFailed && (isAsset || isUpload)
+  const srcSet = !hasSmall
+    ? undefined
+    : isAsset
+      ? `${src.replace(/\.webp$/, '-sm.webp')} 760w, ${src} 1200w`
+      : `${src.replace(/\.[^.]+$/, '-sm.jpg')} ${THUMB_WIDTH}w, ${src} 1200w`
 
   return (
     <img
@@ -48,9 +59,14 @@ export function Media({ src, alt, stub, sizes = '(max-width: 720px) 100vw, 560px
       loading={priority ? 'eager' : 'lazy'}
       decoding={priority ? 'sync' : 'async'}
       fetchpriority={priority ? 'high' : undefined}
+      onError={() => hasSmall && setSmallFailed(true)}
     />
   )
 }
+
+/* Ширина уменьшенной версии загруженного фото — см. THUMB_DIMENSION в
+   server/uploads.js, значения намеренно совпадают. */
+const THUMB_WIDTH = 480
 
 export function Loading({ count = 3 }) {
   return (

@@ -18,6 +18,16 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // Загруженные через админку фото сервер отдаёт с того же порта, что
+      // и API (см. server/index.js) — без этой строки они не проксируются
+      // вовсе, и при локальной разработке через отдельный vite-клиент
+      // /uploads/… у vite нет, а у бэкенда есть: до сих пор это было не
+      // видно, потому что тестовые данные — снимки из /assets, которые
+      // раздаёт сам vite.
+      '/uploads': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
   build: {

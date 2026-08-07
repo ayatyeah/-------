@@ -37,6 +37,7 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import sharp from 'sharp'
 import { STORE_PATH, slugify } from './store.js'
 
 /**
@@ -262,10 +263,80 @@ function writeUpload(buf, originalName, kind, fallbackStem) {
 }
 
 /**
- * Записывает картинку на диск.
- * Возвращает { name, path, size } либо бросает ошибку с полем status.
+ * Обработка фото через sharp (задача 20): пересжатие, обрезка по потолку
+ * размера и снимок метаданных — EXIF (включая координаты съёмки, если
+ * телефон их записал) в исходном файле, а sharp по умолчанию отдаёт
+ * буфер БЕЗ метаданных, если явно не попросить их сохранить (.withMetadata()
+ * здесь нигде не вызывается). Заказчик может не задумываться, откуда
+ * сфотографирован трактор, — координаты не попадут на сайт вместе с фото.
+ *
+ * Побочный эффект пересжатия — та же защита, что и проверка на «полиглот»
+ * ниже, но надёжнее: результат sharp — это заново собранные пиксели,
+ * никакой посторонний байт из исходного файла в него попасть не может.
+ *
+ * GIF не трогаем: sharp разбирает его как один кадр, и анимация терялась
+ * бы молча. Единственный формат без строгого потолка размера и обрезки
+ * метаданных — риск умеренный (анимации не бывают с гигапиксельной сеткой
+ * координат внутри).
  */
-export function saveImage(buf, originalName = '') {
+const MAX_DIMENSION = 2000
+const THUMB_DIMENSION = 480
+/* Имя уменьшенной версии предсказуемо: <тот же стем>-sm.jpg (см. makeThumb
+   и saveImage ниже). Восьмизначный шестнадцатеричный хвост в стеме —
+   случайный (см. safeName) и с обычным именем файла, которое загрузил бы
+   человек, не совпадёт. */
+const THUMB_RE = /-[0-9a-f]{8}-sm\.jpg$/i
+const ENCODERS = {
+  jpg: (img) => img.jpeg({ quality: 85, mozjpeg: true }),
+  png: (img) => img.png({ compressionLevel: 8 }),
+  webp: (img) => img.webp({ quality: 85 }),
+}
+
+/** Пересжимает и ужимает до потолка размера. Не смогла — отдаёт буфер как
+    есть: заказчику важнее, чтобы фото сохранилось, а не идеальная обработка. */
+async function reencode(buf, ext) {
+  const encode = ENCODERS[ext]
+  if (!encode) return buf
+  try {
+    // .rotate() без аргументов — поворачивает по EXIF Orientation, ПЕРЕД
+    // тем как остальные метаданные (включая эту же Orientation) отбрасываются.
+    // Без этого шага снимок с телефона, снятый «на бок», лёг бы на сайт
+    // повёрнутым — EXIF, который это компенсировал, мы как раз стираем.
+    const pipeline = encode(sharp(buf, { failOn: 'none' }).rotate().resize({
+      width: MAX_DIMENSION,
+      height: MAX_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    }))
+    return await pipeline.toBuffer()
+  } catch (e) {
+    console.warn('sharp: не удалось обработать изображение, сохраняю как есть:', e.message)
+    return buf
+  }
+}
+
+/** Уменьшенная версия для карточек каталога (см. Media в src/components/ui.jsx) —
+    всегда JPEG независимо от исходного формата: превью маленькое, точная
+    передача формата ему не нужна, а один формат проще кэшировать. */
+async function makeThumb(buf) {
+  try {
+    return await sharp(buf, { failOn: 'none' })
+      .rotate()
+      .resize({ width: THUMB_DIMENSION, height: THUMB_DIMENSION, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+  } catch (e) {
+    console.warn('sharp: не удалось собрать превью:', e.message)
+    return null
+  }
+}
+
+/**
+ * Записывает картинку на диск: основной файл плюс уменьшенную версию
+ * `<имя>-sm.<расширение>` рядом (см. makeThumb). Возвращает
+ * { name, path, size, thumbPath } либо бросает ошибку с полем status.
+ */
+export async function saveImage(buf, originalName = '') {
   const kind = detectImage(buf)
   if (!kind) {
     throw Object.assign(
@@ -273,7 +344,22 @@ export function saveImage(buf, originalName = '') {
       { status: 415 }
     )
   }
-  return writeUpload(buf, originalName, kind, 'img')
+
+  const processed = kind.ext === 'gif' ? buf : await reencode(buf, kind.ext)
+  const saved = writeUpload(processed, originalName, kind, 'img')
+
+  let thumbPath = null
+  if (kind.ext !== 'gif') {
+    const thumbBuf = await makeThumb(buf)
+    if (thumbBuf) {
+      const stem = saved.name.replace(/\.[^.]+$/, '')
+      const thumbName = `${stem}-sm.jpg`
+      writeFileSync(join(UPLOAD_DIR, thumbName), thumbBuf)
+      thumbPath = `${UPLOAD_URL_PREFIX}/${thumbName}`
+    }
+  }
+
+  return { ...saved, thumbPath }
 }
 
 /**
@@ -305,6 +391,17 @@ export function removeFile(name) {
   if (!resolve(full).startsWith(resolve(UPLOAD_DIR))) return false
   if (!existsSync(full)) return false
   unlinkSync(full)
+
+  // Уменьшенная версия удаляется вместе с основной — иначе на диске
+  // навсегда остаётся сиротский -sm.jpg без картинки, на которую он ссылался.
+  const thumb = join(UPLOAD_DIR, safe.replace(/\.[^.]+$/, '-sm.jpg'))
+  if (thumb !== full && existsSync(thumb)) {
+    try {
+      unlinkSync(thumb)
+    } catch {
+      /* превью — не главное, ошибку удаления игнорируем */
+    }
+  }
   return true
 }
 
@@ -321,11 +418,16 @@ export function fileExists(name) {
  * Файлы на диске, которых нет в описи (и наоборот).
  * Пригождается после восстановления из бэкапа: опись и каталог могли
  * разъехаться, и лучше показать это честно, чем рисовать битые картинки.
+ *
+ * Уменьшенные версии (см. makeThumb выше) сюда не попадают: это не
+ * самостоятельная картинка, а служебный файл при основной, в опись он и
+ * не должен записываться — иначе библиотека фото в админке задваивалась
+ * бы на каждый снимок.
  */
 export function listFiles() {
   ensureDir()
   return readdirSync(UPLOAD_DIR)
-    .filter((f) => !f.endsWith('.part') && !f.startsWith('.'))
+    .filter((f) => !f.endsWith('.part') && !f.startsWith('.') && !THUMB_RE.test(f))
     .map((f) => {
       const st = statSync(join(UPLOAD_DIR, f))
       return { name: f, path: `${UPLOAD_URL_PREFIX}/${f}`, size: st.size, at: st.mtime.toISOString() }

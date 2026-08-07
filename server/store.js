@@ -1079,6 +1079,14 @@ function phoneCountMap() {
   return counts
 }
 
+/** Сколько дней после закрытия заявки («Обработана») хранить, кто именно
+    обращался (задача 20) — дальше store.requests.anonymizeStale() стирает
+    имя, телефон и текст обращения, оставляя дату/тип/статус/регион/модель
+    для статистики. 730 дней (2 года) — тот же срок, что и гарантия на
+    технику: обычно это и есть верхняя граница, когда данные ещё нужны для
+    работы с обращением (гарантийный случай, повторная покупка, спор). */
+const RETENTION_DAYS = Math.max(1, Number(process.env.REQUEST_RETENTION_DAYS) || 730)
+
 const REQUEST_SORT_KEYS = ['createdAt', 'date', 'fio', 'status', 'aiScore', 'nextContactAt']
 
 /** Общий фильтр + сортировка для requests.query()/exportRows() — без
@@ -1178,6 +1186,9 @@ export const requests = {
       // 6), где строку пришлось бы разбирать обратно на части.
       modelId: modelId || '',
       region: region || '',
+      // Обезличивание по сроку хранения (задача 20) — см. requests.anonymizeStale.
+      anonymized: false,
+      anonymizedAt: null,
       // Рабочие пометки менеджера (задача 4) — не от посетителя, заполняются
       // только в админке.
       notes: '',
@@ -1285,6 +1296,43 @@ export const requests = {
     data.requests.splice(i, 1)
     save()
     return true
+  },
+  /**
+   * Обезличивание по сроку хранения (задача 20).
+   *
+   * Заявка, закрытая («Обработана») больше RETENTION_DAYS назад, теряет
+   * всё, что называет конкретного человека, — имя, телефон, комментарий,
+   * рабочие пометки, метки перехода. Дата, тип, статус, регион и модель
+   * остаются: это то же событие в статистике дашборда, просто без
+   * привязки к личности. Уже обезличенные заявки повторно не трогаем —
+   * не бросается ли имя вообще нельзя сравнить, если его уже стёрли.
+   *
+   * Вызывается по расписанию (см. server/index.js), а не сразу при смене
+   * статуса: смысл срока хранения именно в том, что данные нужны какое-то
+   * время ПОСЛЕ закрытия — на случай гарантийного обращения, повторной
+   * покупки, спора.
+   */
+  anonymizeStale() {
+    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000
+    const at = new Date().toISOString()
+    let count = 0
+    for (const r of data.requests) {
+      if (r.anonymized || r.status !== 'Обработана' || !r.resolvedAt) continue
+      if (new Date(r.resolvedAt).getTime() > cutoff) continue
+      r.fio = 'Обезличено'
+      r.phone = ''
+      r.comment = ''
+      r.notes = ''
+      r.utmSource = ''
+      r.utmMedium = ''
+      r.utmCampaign = ''
+      r.referrer = ''
+      r.anonymized = true
+      r.anonymizedAt = at
+      count++
+    }
+    if (count) save()
+    return count
   },
 }
 

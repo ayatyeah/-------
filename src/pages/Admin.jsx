@@ -1242,14 +1242,25 @@ function RequestsTab({ requests, reload, models }) {
                     )}
                   </td>
                   <td className="card-title" style={{ fontWeight: 500 }}>
-                    {r.fio}
-                    {/* Доказательство согласия на обработку данных: когда его
-                        дали и с какой редакцией политики. Если человек
-                        спросит «на что я подписывался» — ответ здесь. */}
-                    {r.consentAt && (
-                      <div className="consent-mark" title={`Редакция политики: ${r.policyVersion || '—'}`}>
-                        согласие {formatConsent(r.consentAt)}
-                      </div>
+                    {r.anonymized ? (
+                      <span
+                        className="tag tag-muted"
+                        title={`Личные данные стёрты по сроку хранения — заявка закрыта ${formatDateShort(r.resolvedAt)}`}
+                      >
+                        Обезличено
+                      </span>
+                    ) : (
+                      <>
+                        {r.fio}
+                        {/* Доказательство согласия на обработку данных: когда его
+                            дали и с какой редакцией политики. Если человек
+                            спросит «на что я подписывался» — ответ здесь. */}
+                        {r.consentAt && (
+                          <div className="consent-mark" title={`Редакция политики: ${r.policyVersion || '—'}`}>
+                            согласие {formatConsent(r.consentAt)}
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td data-label="Статус">
@@ -1265,16 +1276,22 @@ function RequestsTab({ requests, reload, models }) {
                     </select>
                   </td>
                   <td data-label="Телефон" style={{ whiteSpace: 'nowrap' }}>
-                    <a
-                      href={`tel:${r.phone.replace(/\s/g, '')}`}
-                      style={{ borderBottom: '1px solid var(--rule-strong)' }}
-                    >
-                      {r.phone}
-                    </a>
-                    {r.duplicateCount > 1 && (
-                      <div className="tag tag-danger" style={{ marginTop: 4 }} title="Этот телефон встречается в нескольких заявках">
-                        дубль ×{r.duplicateCount}
-                      </div>
+                    {r.anonymized ? (
+                      '—'
+                    ) : (
+                      <>
+                        <a
+                          href={`tel:${r.phone.replace(/\s/g, '')}`}
+                          style={{ borderBottom: '1px solid var(--rule-strong)' }}
+                        >
+                          {r.phone}
+                        </a>
+                        {r.duplicateCount > 1 && (
+                          <div className="tag tag-danger" style={{ marginTop: 4 }} title="Этот телефон встречается в нескольких заявках">
+                            дубль ×{r.duplicateCount}
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td data-label="Модель / регион" style={{ color: 'var(--text-2)' }}>
