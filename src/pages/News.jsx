@@ -12,7 +12,7 @@ export default function News() {
     description:
       'Новости завода СХМ Агро, обновления модельного ряда сельхозтехники, разборы по субсидиям и лизингу для аграриев Казахстана.',
   })
-  const { t, fdate } = useT()
+  const { t, fdate, tField } = useT()
   const { data, loading, error, reload } = useFetch(() => api.news(), [])
   const items = data ?? []
 
@@ -42,12 +42,12 @@ export default function News() {
                     поисковику. Раньше открывалась только onClick. */}
                 <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
-                    <Media src={n.cover} alt={n.title} stub={t('cover_stub')} />
+                    <Media src={n.cover} alt={tField(n, 'title')} stub={t('cover_stub')} />
                   </div>
                   <div className="card-body">
                     <span className="card-meta">{fdate(n.date)}</span>
-                    <h3 className="card-title">{n.title}</h3>
-                    <p className="card-text">{n.excerpt}</p>
+                    <h3 className="card-title">{tField(n, 'title')}</h3>
+                    <p className="card-text">{tField(n, 'excerpt')}</p>
                     <span className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>
                       {t('read')}
                     </span>

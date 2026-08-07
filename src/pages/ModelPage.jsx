@@ -27,9 +27,12 @@ export default function ModelPage() {
   const catBack = params.get('cat')
   const backToCatalog = () => navigate(catBack ? `/catalog?cat=${catBack}` : '/catalog')
   const { settings, openKP, openCall } = useSite()
-  const { t, td } = useT()
+  const { t, td, tField } = useT()
   const tiltRef = useTilt(7)
   const { data: m, loading, error, reload } = useFetch(() => api.model(id), [id])
+  const mName = m ? tField(m, 'name') : ''
+  const mShort = m ? tField(m, 'short') : ''
+  const mDescr = m ? tField(m, 'descr') : ''
 
   // Похожие модели — та же категория, без текущей (задача 10). Ждём, пока
   // подгрузится сама модель: до этого категория не известна.
@@ -52,9 +55,9 @@ export default function ModelPage() {
   // Пока модель грузится — общий заголовок; загрузилась — её имя и краткое
   // описание. Ошибка/не найдено закрываем от индексации.
   usePageMeta({
-    title: m ? `${m.name} — купить у производителя` : 'Каталог техники',
+    title: m ? `${mName} — купить у производителя` : 'Каталог техники',
     description: m
-      ? `${m.short || ''} Купить ${m.name} напрямую у завода СХМ Агро: характеристики, гарантия 2 года, лизинг и субсидии, доставка по Казахстану.`.trim()
+      ? `${mShort} Купить ${mName} напрямую у завода СХМ Агро: характеристики, гарантия 2 года, лизинг и субсидии, доставка по Казахстану.`.trim()
       : undefined,
     noindex: !!error,
   })
@@ -122,7 +125,7 @@ export default function ModelPage() {
                     {badge && <span className={`tag ${badge.cls}`}>{t(badge.key)}</span>}
                   </span>
                 )}
-                <Media src={active} alt={m.name} stub={`${m.name} · ${t('photo')}`} priority />
+                <Media src={active} alt={mName} stub={`${mName} · ${t('photo')}`} priority />
                 {active && (
                   <span className="model-hero-zoom-hint" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -158,16 +161,16 @@ export default function ModelPage() {
               фото короче колонки с характеристиками (grid align-items: start
               не тянет её по высоте) — без этого под миниатюрами оставалась
               пустая плашка. */}
-          {m.short && (
+          {mShort && (
             <Reveal delay={120}>
-              <p className="model-left-desc">{m.short}</p>
+              <p className="model-left-desc">{mShort}</p>
             </Reveal>
           )}
         </div>
 
         <Reveal variant="right" delay={100}>
           <span className="card-kicker">{td(m.catName)}</span>
-          <h1 className="model-title">{m.name}</h1>
+          <h1 className="model-title">{mName}</h1>
 
           {m.subsidized && (
             <div className="subsidy-note">
@@ -181,7 +184,7 @@ export default function ModelPage() {
             </div>
           )}
 
-          <p className="model-desc">{m.descr}</p>
+          <p className="model-desc">{mDescr}</p>
 
           <div className="model-actions">
             <button type="button" className="btn btn-primary" onClick={() => openKP(m)}>
@@ -284,7 +287,7 @@ export default function ModelPage() {
         <PhotoLightbox
           photos={photos}
           startIndex={photos.indexOf(active)}
-          alt={m.name}
+          alt={mName}
           onClose={() => setLightbox(false)}
         />
       )}

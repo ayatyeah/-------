@@ -73,6 +73,26 @@ export function I18nProvider({ children }) {
       return dict.data[text] ?? text
     }
 
+    /**
+     * Переводное поле модели/новости (п.16 дорожной карты): `field_kk` /
+     * `field_en`, если заказчик их заполнил, иначе — русский оригинал.
+     * Пустой перевод — это не ошибка, а нормальное состояние: заказчик ещё
+     * не перевёл текст, и русский текст лучше пустой карточки.
+     */
+    const tField = (obj, field) => {
+      if (!obj) return ''
+      if (lang === 'ru') return obj[field] ?? ''
+      return obj[`${field}_${lang}`] || obj[field] || ''
+    }
+
+    /** То же для массива абзацев (body новости). */
+    const tParas = (obj, field) => {
+      if (!obj) return []
+      if (lang === 'ru') return obj[field] ?? []
+      const translated = obj[`${field}_${lang}`]
+      return Array.isArray(translated) && translated.length ? translated : obj[field] ?? []
+    }
+
     /** Дата в формате выбранного языка: «8 июля 2026 г.» / «8 шілде 2026 ж.» / «8 July 2026». */
     const fdate = (iso) => {
       if (!iso) return ''
@@ -88,7 +108,7 @@ export function I18nProvider({ children }) {
       return `${n} ${n === 1 ? 'model' : 'models'}`
     }
 
-    return { lang, setLang, t, td, fdate, tModels }
+    return { lang, setLang, t, td, tField, tParas, fdate, tModels }
   }, [lang])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>

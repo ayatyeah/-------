@@ -1019,3 +1019,103 @@ export async function generateModelDescription({ name, catName, specs, subsidize
     engine: res.engine,
   }
 }
+
+/* ======================================================================
+   5. ПЕРЕВОД КАРТОЧКИ МОДЕЛИ И НОВОСТИ (задача 16)
+   ====================================================================== */
+
+const TRANSLATE_LANG_NAME = { kk: 'казахский', en: 'английский' }
+
+/** Черновик — не публикуется молча: результат ложится в поля формы, и
+    администратор видит и правит его перед сохранением, как и с описанием
+    (см. generateModelDescription). Автоматической публикации перевода нет
+    нигде в системе. */
+const TRANSLATE_SYSTEM = (targetLang) => `Ты переводишь тексты сайта ТОО «СХМ Агро» (производство и продажа сельхозтехники в Казахстане) с русского на ${TRANSLATE_LANG_NAME[targetLang]}.
+
+Переводи по смыслу, деловым тоном, без отсебятины и без потери фактов. Числа и код модели (латиница/цифры вроде «СХМ-2204») оставляй как есть, а вот сокращения единиц измерения переводи или используй общепринятые в целевом языке (например, русское «л.с.» → «hp» по-английски, «а.к.» по-казахски). Ничего не добавляй и не поясняй — только перевод присланных полей.`
+
+const MODEL_TRANSLATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Перевод названия модели' },
+    short: { type: 'string', description: 'Перевод краткого описания' },
+    descr: { type: 'string', description: 'Перевод полного описания' },
+  },
+  required: ['name', 'short', 'descr'],
+}
+
+/** Переводит карточку модели (название, краткое и полное описание) на kk/en. */
+export async function translateModel({ name, short, descr, targetLang }) {
+  if (!TRANSLATE_LANG_NAME[targetLang]) throw Object.assign(new Error('Неизвестный язык перевода'), { status: 400 })
+  if (!aiEnabled()) return { name: '', short: '', descr: '', engine: 'rules', error: 'ИИ сейчас недоступен' }
+
+  const res = await ask({
+    label: `перевод модели «${name}» на ${TRANSLATE_LANG_NAME[targetLang]}`,
+    system: TRANSLATE_SYSTEM(targetLang),
+    schema: MODEL_TRANSLATE_SCHEMA,
+    maxTokens: 2000,
+    think: false,
+    messages: [
+      {
+        role: 'user',
+        content: `Название: ${name}\nКраткое описание: ${short || '—'}\nПолное описание: ${descr || '—'}\n\nВерни JSON по схеме.`,
+      },
+    ],
+  })
+
+  const parsed = res && parseJson(res.text)
+  if (!parsed?.name && !parsed?.short && !parsed?.descr) {
+    return { name: '', short: '', descr: '', engine: res?.engine || 'ошибка', error: 'Не удалось перевести' }
+  }
+  return {
+    name: String(parsed.name || '').slice(0, 200),
+    short: String(parsed.short || '').slice(0, 400),
+    descr: String(parsed.descr || '').slice(0, 8000),
+    engine: res.engine,
+  }
+}
+
+const NEWS_TRANSLATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'Перевод заголовка' },
+    excerpt: { type: 'string', description: 'Перевод краткого анонса' },
+    body: { type: 'array', items: { type: 'string' }, description: 'Перевод текста статьи по абзацам, в том же порядке' },
+  },
+  required: ['title', 'excerpt', 'body'],
+}
+
+/** Переводит статью (заголовок, анонс, абзацы) на kk/en. */
+export async function translateNews({ title, excerpt, body, targetLang }) {
+  if (!TRANSLATE_LANG_NAME[targetLang]) throw Object.assign(new Error('Неизвестный язык перевода'), { status: 400 })
+  if (!aiEnabled()) return { title: '', excerpt: '', body: [], engine: 'rules', error: 'ИИ сейчас недоступен' }
+
+  const paragraphs = (body || []).filter(Boolean)
+  const res = await ask({
+    label: `перевод новости «${title}» на ${TRANSLATE_LANG_NAME[targetLang]}`,
+    system: TRANSLATE_SYSTEM(targetLang),
+    schema: NEWS_TRANSLATE_SCHEMA,
+    maxTokens: 4000,
+    think: false,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Заголовок: ${title}\nАнонс: ${excerpt || '—'}\n\nАбзацы:\n` +
+          paragraphs.map((p, i) => `${i + 1}. ${p}`).join('\n') +
+          '\n\nВерни JSON по схеме — массив body должен содержать ровно столько же абзацев, в том же порядке.',
+      },
+    ],
+  })
+
+  const parsed = res && parseJson(res.text)
+  if (!parsed?.title && !parsed?.excerpt && !parsed?.body?.length) {
+    return { title: '', excerpt: '', body: [], engine: res?.engine || 'ошибка', error: 'Не удалось перевести' }
+  }
+  return {
+    title: String(parsed.title || '').slice(0, 250),
+    excerpt: String(parsed.excerpt || '').slice(0, 500),
+    body: Array.isArray(parsed.body) ? parsed.body.slice(0, 120).map((p) => String(p).slice(0, 4000)) : [],
+    engine: res.engine,
+  }
+}

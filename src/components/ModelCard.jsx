@@ -20,28 +20,29 @@ export const BADGE_TAGS = {
  */
 export default function ModelCard({ model: m, href, delay = 0 }) {
   const { openKP } = useSite()
-  const { t, td } = useT()
+  const { t, td, tField } = useT()
   const badge = BADGE_TAGS[m.badge]
+  const name = tField(m, 'name')
 
   return (
     <Reveal delay={delay}>
       <article className="card card--link" style={{ height: '100%' }}>
-        <Link to={href} className="card-media" aria-label={m.name}>
+        <Link to={href} className="card-media" aria-label={name}>
           <div className="card-media-tags">
             {m.flagship && <span className="tag tag-flagship">{t('flagship')}</span>}
             {m.subsidized && <span className="tag tag-brass">{t('subsidized')}</span>}
             {badge && <span className={`tag ${badge.cls}`}>{t(badge.key)}</span>}
           </div>
-          <Media src={m.photo} alt={m.name} stub={td(m.catName)} />
+          <Media src={m.photo} alt={name} stub={td(m.catName)} />
         </Link>
         <div className="card-body">
           <span className="card-kicker">{td(m.catName)}</span>
           <h3 className="card-title">
             <Link to={href} className="card-title-link">
-              {m.name}
+              {name}
             </Link>
           </h3>
-          <p className="card-text">{m.short}</p>
+          <p className="card-text">{tField(m, 'short')}</p>
           {/* 2-3 ключевые характеристики прямо на карточке (задача 9) —
               чтобы сравнивать модели, не открывая каждую по очереди. */}
           {m.specs?.length > 0 && (

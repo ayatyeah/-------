@@ -106,6 +106,11 @@ export const api = {
     generateModelDescription: (body) =>
       request('/admin/models/generate-description', { method: 'POST', body, auth: true }),
 
+    /** Черновик перевода карточки модели на kk/en. */
+    translateModel: (body) => request('/admin/models/translate', { method: 'POST', body, auth: true }),
+    /** Черновик перевода статьи на kk/en. */
+    translateNews: (body) => request('/admin/news/translate', { method: 'POST', body, auth: true }),
+
     news: () => request('/news?all=1', { auth: true }),
     createNews: (body) => request('/news', { method: 'POST', body, auth: true }),
     updateNews: (id, body) => request(`/news/${id}`, { method: 'PUT', body, auth: true }),

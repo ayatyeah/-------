@@ -847,6 +847,29 @@ app.post('/api/admin/models/generate-description', requireAdmin, limitAnalyze, w
   res.json(result)
 }))
 
+/* Черновик перевода карточки модели на kk/en (задача 16) — кнопка в форме
+   модели. Результат ложится в поля формы, публикуется только после того,
+   как администратор его проверит и сохранит — как и с описанием выше. */
+app.post('/api/admin/models/translate', requireAdmin, limitAnalyze, wrap(async (req, res) => {
+  if (aiBudgetLeft() <= 0) {
+    return res.status(429).json({ error: 'Суточный лимит обращений к ИИ исчерпан. Попробуйте завтра.' })
+  }
+  const name = clean(req.body?.name, 200)
+  if (!name) return res.status(400).json({ error: 'Сначала укажите название модели' })
+  const targetLang = req.body?.targetLang === 'en' ? 'en' : req.body?.targetLang === 'kk' ? 'kk' : ''
+  if (!targetLang) return res.status(400).json({ error: 'Не указан язык перевода' })
+
+  aiBudgetTake()
+  const result = await ai.translateModel({
+    name,
+    short: clean(req.body?.short, 400),
+    descr: clean(req.body?.descr, 8000),
+    targetLang,
+  })
+  if (result.error) return res.status(422).json({ error: result.error })
+  res.json(result)
+}))
+
 /* -------------------------------- новости ------------------------------ */
 
 app.get('/api/news', wrap((req, res) => {
@@ -884,6 +907,30 @@ app.delete('/api/news/:id', requireAdmin, limitAdminWrite, wrap((req, res) => {
     return res.status(404).json({ error: 'Статья не найдена' })
   }
   res.json({ ok: true })
+}))
+
+/* Черновик перевода статьи на kk/en (задача 16) — та же логика, что и у
+   перевода модели выше: результат правится в форме перед сохранением. */
+app.post('/api/admin/news/translate', requireAdmin, limitAnalyze, wrap(async (req, res) => {
+  if (aiBudgetLeft() <= 0) {
+    return res.status(429).json({ error: 'Суточный лимит обращений к ИИ исчерпан. Попробуйте завтра.' })
+  }
+  const title = clean(req.body?.title, 250)
+  if (!title) return res.status(400).json({ error: 'Сначала укажите заголовок' })
+  const targetLang = req.body?.targetLang === 'en' ? 'en' : req.body?.targetLang === 'kk' ? 'kk' : ''
+  if (!targetLang) return res.status(400).json({ error: 'Не указан язык перевода' })
+
+  const body = Array.isArray(req.body?.body) ? req.body.body.slice(0, 120).map((p) => clean(p, 4000)) : []
+
+  aiBudgetTake()
+  const result = await ai.translateNews({
+    title,
+    excerpt: clean(req.body?.excerpt, 500),
+    body,
+    targetLang,
+  })
+  if (result.error) return res.status(422).json({ error: result.error })
+  res.json(result)
 }))
 
 /* -------------------------------- заявки ------------------------------- */

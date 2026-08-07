@@ -2771,6 +2771,42 @@ select.input {
   border-bottom: 1px solid var(--rule);
 }
 
+/* --- переводы модели/новости (задача 16) --------------------------------- */
+
+.admin-translate {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.admin-translate summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.admin-translate[open] summary {
+  margin-bottom: 14px;
+}
+
+.translate-lang {
+  margin-top: 14px;
+}
+
+.translate-lang:first-of-type {
+  margin-top: 0;
+}
+
+.translate-lang-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .row-actions {
   display: flex;
   gap: 4px;

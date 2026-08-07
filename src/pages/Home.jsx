@@ -47,7 +47,7 @@ export default function Home() {
   })
   // Все данные главной приходят одним запросом /api/home из провайдера.
   const { settings, home, openKP } = useSite()
-  const { t, td, fdate, lang } = useT()
+  const { t, td, fdate, lang, tField } = useT()
   const navigate = useNavigate()
   const [cert, setCert] = useState(null)
   const tiltRef = useTilt(9)
@@ -279,12 +279,12 @@ export default function Home() {
               <Reveal key={n.id} delay={i * 110}>
                 <Link to={`/news/${n.id}`} className="card card--link" style={{ height: '100%' }}>
                   <div className="card-media">
-                    <Media src={n.cover} alt={n.title} stub={t('cover_stub')} />
+                    <Media src={n.cover} alt={tField(n, 'title')} stub={t('cover_stub')} />
                   </div>
                   <div className="card-body">
                     <span className="card-meta">{fdate(n.date)}</span>
-                    <h3 className="card-title">{n.title}</h3>
-                    <p className="card-text">{n.excerpt}</p>
+                    <h3 className="card-title">{tField(n, 'title')}</h3>
+                    <p className="card-text">{tField(n, 'excerpt')}</p>
                     <span className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>
                       {t('read')}
                     </span>

@@ -133,11 +133,18 @@ export function ModelForm({ model, cats, onSave, onClose }) {
     badge: model?.badge ?? '',
     flagship: model?.flagship ?? false,
     testimonial: model?.testimonial ?? { quote: '', author: '' },
+    name_kk: model?.name_kk ?? '',
+    name_en: model?.name_en ?? '',
+    short_kk: model?.short_kk ?? '',
+    short_en: model?.short_en ?? '',
+    descr_kk: model?.descr_kk ?? '',
+    descr_en: model?.descr_en ?? '',
   })
   const [specs, setSpecs] = useState(model?.specs ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
+  const [translating, setTranslating] = useState({ kk: false, en: false })
 
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const updTestimonial = (k, v) => setF((p) => ({ ...p, testimonial: { ...p.testimonial, [k]: v } }))
@@ -164,6 +171,28 @@ export function ModelForm({ model, cats, onSave, onClose }) {
       setError(err.message)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  /* Черновик перевода (задача 16) — тот же провайдер и та же дисциплина
+     подтверждения перед заменой, что и у описания выше. Перевод ложится в
+     поля формы и публикуется только вместе с остальной моделью по кнопке
+     «Сохранить» — сам по себе он ничего не меняет на сайте. */
+  async function translateTo(targetLang) {
+    const label = targetLang === 'kk' ? 'казахский' : 'английский'
+    const hasExisting = f[`name_${targetLang}`] || f[`short_${targetLang}`] || f[`descr_${targetLang}`]
+    if (hasExisting && !confirm(`Заменить уже введённый перевод (${label})?`)) return
+    setTranslating((p) => ({ ...p, [targetLang]: true }))
+    setError(null)
+    try {
+      const res = await api.admin.translateModel({ name: f.name, short: f.short, descr: f.descr, targetLang })
+      upd(`name_${targetLang}`, res.name)
+      upd(`short_${targetLang}`, res.short)
+      upd(`descr_${targetLang}`, res.descr)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setTranslating((p) => ({ ...p, [targetLang]: false }))
     }
   }
 
@@ -254,6 +283,80 @@ export function ModelForm({ model, cats, onSave, onClose }) {
             placeholder="Текст на странице модели"
           />
         </div>
+
+        {/* Переводы (задача 16) — необязательны. Пусто на kk/en — сайт
+            просто показывает русский текст на этой карточке, не пустоту. */}
+        <details className="admin-translate">
+          <summary>Переводы (қазақша / English)</summary>
+
+          <div className="translate-lang">
+            <div className="translate-lang-head">
+              <b>Қазақша</b>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => translateTo('kk')}
+                disabled={translating.kk || !f.name.trim()}
+              >
+                {translating.kk ? 'Перевожу…' : '✨ Перевести (ИИ)'}
+              </button>
+            </div>
+            <input
+              className="input"
+              value={f.name_kk}
+              onChange={(e) => upd('name_kk', e.target.value)}
+              placeholder="Атауы"
+              style={{ marginBottom: 8 }}
+            />
+            <input
+              className="input"
+              value={f.short_kk}
+              onChange={(e) => upd('short_kk', e.target.value)}
+              placeholder="Қысқаша сипаттама"
+              style={{ marginBottom: 8 }}
+            />
+            <textarea
+              className="input"
+              value={f.descr_kk}
+              onChange={(e) => upd('descr_kk', e.target.value)}
+              placeholder="Толық сипаттама"
+            />
+          </div>
+
+          <div className="translate-lang">
+            <div className="translate-lang-head">
+              <b>English</b>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => translateTo('en')}
+                disabled={translating.en || !f.name.trim()}
+              >
+                {translating.en ? 'Translating…' : '✨ Перевести (ИИ)'}
+              </button>
+            </div>
+            <input
+              className="input"
+              value={f.name_en}
+              onChange={(e) => upd('name_en', e.target.value)}
+              placeholder="Name"
+              style={{ marginBottom: 8 }}
+            />
+            <input
+              className="input"
+              value={f.short_en}
+              onChange={(e) => upd('short_en', e.target.value)}
+              placeholder="Short description"
+              style={{ marginBottom: 8 }}
+            />
+            <textarea
+              className="input"
+              value={f.descr_en}
+              onChange={(e) => upd('descr_en', e.target.value)}
+              placeholder="Full description"
+            />
+          </div>
+        </details>
 
         <SpecsEditor
           specs={specs}
@@ -348,23 +451,66 @@ export function NewsForm({ item, onSave, onClose }) {
     excerpt: item?.excerpt ?? '',
     cover: item?.cover ?? '',
     published: item?.published ?? true,
+    title_kk: item?.title_kk ?? '',
+    title_en: item?.title_en ?? '',
+    excerpt_kk: item?.excerpt_kk ?? '',
+    excerpt_en: item?.excerpt_en ?? '',
   })
   const [body, setBody] = useState((item?.body ?? []).join('\n\n'))
+  const [bodyKk, setBodyKk] = useState((item?.body_kk ?? []).join('\n\n'))
+  const [bodyEn, setBodyEn] = useState((item?.body_en ?? []).join('\n\n'))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [translating, setTranslating] = useState({ kk: false, en: false })
 
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }))
+  const toParagraphs = (text) =>
+    text
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+
+  /* Черновик перевода (задача 16) — та же дисциплина подтверждения перед
+     заменой, что и у модели: результат правится в форме, публикуется
+     только вместе со статьёй по кнопке «Сохранить». */
+  async function translateTo(targetLang) {
+    const label = targetLang === 'kk' ? 'казахский' : 'английский'
+    const existingBody = targetLang === 'kk' ? bodyKk : bodyEn
+    const hasExisting = f[`title_${targetLang}`] || f[`excerpt_${targetLang}`] || existingBody
+    if (hasExisting && !confirm(`Заменить уже введённый перевод (${label})?`)) return
+    setTranslating((p) => ({ ...p, [targetLang]: true }))
+    setError(null)
+    try {
+      const res = await api.admin.translateNews({
+        title: f.title,
+        excerpt: f.excerpt,
+        body: toParagraphs(body),
+        targetLang,
+      })
+      upd(`title_${targetLang}`, res.title)
+      upd(`excerpt_${targetLang}`, res.excerpt)
+      const joined = (res.body || []).join('\n\n')
+      if (targetLang === 'kk') setBodyKk(joined)
+      else setBodyEn(joined)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setTranslating((p) => ({ ...p, [targetLang]: false }))
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      const paragraphs = body
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter(Boolean)
-      await onSave({ ...f, cover: f.cover || null, body: paragraphs })
+      await onSave({
+        ...f,
+        cover: f.cover || null,
+        body: toParagraphs(body),
+        body_kk: toParagraphs(bodyKk),
+        body_en: toParagraphs(bodyEn),
+      })
       onClose()
     } catch (err) {
       setError(err.message)
@@ -423,6 +569,82 @@ export function NewsForm({ item, onSave, onClose }) {
             placeholder="Абзацы разделяйте пустой строкой"
           />
         </div>
+
+        {/* Переводы (задача 16) — необязательны. Пусто на kk/en — сайт
+            просто показывает русский текст этой статьи, не пустоту. */}
+        <details className="admin-translate">
+          <summary>Переводы (қазақша / English)</summary>
+
+          <div className="translate-lang">
+            <div className="translate-lang-head">
+              <b>Қазақша</b>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => translateTo('kk')}
+                disabled={translating.kk || !f.title.trim()}
+              >
+                {translating.kk ? 'Перевожу…' : '✨ Перевести (ИИ)'}
+              </button>
+            </div>
+            <input
+              className="input"
+              value={f.title_kk}
+              onChange={(e) => upd('title_kk', e.target.value)}
+              placeholder="Тақырыбы"
+              style={{ marginBottom: 8 }}
+            />
+            <input
+              className="input"
+              value={f.excerpt_kk}
+              onChange={(e) => upd('excerpt_kk', e.target.value)}
+              placeholder="Қысқаша аннотация"
+              style={{ marginBottom: 8 }}
+            />
+            <textarea
+              className="input"
+              style={{ minHeight: 120 }}
+              value={bodyKk}
+              onChange={(e) => setBodyKk(e.target.value)}
+              placeholder="Мәтін — абзацтарды бос жолмен бөліңіз"
+            />
+          </div>
+
+          <div className="translate-lang">
+            <div className="translate-lang-head">
+              <b>English</b>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => translateTo('en')}
+                disabled={translating.en || !f.title.trim()}
+              >
+                {translating.en ? 'Translating…' : '✨ Перевести (ИИ)'}
+              </button>
+            </div>
+            <input
+              className="input"
+              value={f.title_en}
+              onChange={(e) => upd('title_en', e.target.value)}
+              placeholder="Title"
+              style={{ marginBottom: 8 }}
+            />
+            <input
+              className="input"
+              value={f.excerpt_en}
+              onChange={(e) => upd('excerpt_en', e.target.value)}
+              placeholder="Short excerpt"
+              style={{ marginBottom: 8 }}
+            />
+            <textarea
+              className="input"
+              style={{ minHeight: 120 }}
+              value={bodyEn}
+              onChange={(e) => setBodyEn(e.target.value)}
+              placeholder="Body text — separate paragraphs with a blank line"
+            />
+          </div>
+        </details>
 
         <label className="check">
           <input

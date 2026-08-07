@@ -683,6 +683,15 @@ export const models = {
       badge: cleanBadge(body.badge),
       flagship: !!body.flagship,
       testimonial: cleanTestimonial(body.testimonial),
+      // Переводы (п.16 дорожной карты) — необязательны и пусты по умолчанию:
+      // без перевода сайт на kk/en просто показывает русский текст (см.
+      // shared/i18n-fallback.js), а не пустую карточку.
+      name_kk: str(body.name_kk, MAX.name),
+      name_en: str(body.name_en, MAX.name),
+      short_kk: str(body.short_kk, MAX.short),
+      short_en: str(body.short_en, MAX.short),
+      descr_kk: str(body.descr_kk, MAX.descr),
+      descr_en: str(body.descr_en, MAX.descr),
     }
     data.models.push(m)
     save()
@@ -704,6 +713,12 @@ export const models = {
     if (body.badge !== undefined) m.badge = cleanBadge(body.badge)
     if (body.flagship !== undefined) m.flagship = !!body.flagship
     if (body.testimonial !== undefined) m.testimonial = cleanTestimonial(body.testimonial)
+    if (body.name_kk !== undefined) m.name_kk = str(body.name_kk, MAX.name)
+    if (body.name_en !== undefined) m.name_en = str(body.name_en, MAX.name)
+    if (body.short_kk !== undefined) m.short_kk = str(body.short_kk, MAX.short)
+    if (body.short_en !== undefined) m.short_en = str(body.short_en, MAX.short)
+    if (body.descr_kk !== undefined) m.descr_kk = str(body.descr_kk, MAX.descr)
+    if (body.descr_en !== undefined) m.descr_en = str(body.descr_en, MAX.descr)
     save()
     return withCat(m)
   },
@@ -750,6 +765,13 @@ export const news = {
         : ['Текст статьи появится позже.'],
       cover: safeMedia(body.cover),
       published: body.published !== false,
+      // Переводы (п.16 дорожной карты) — см. пояснение у models выше.
+      title_kk: str(body.title_kk, MAX.title),
+      title_en: str(body.title_en, MAX.title),
+      excerpt_kk: str(body.excerpt_kk, MAX.excerpt),
+      excerpt_en: str(body.excerpt_en, MAX.excerpt),
+      body_kk: cleanParagraphs(body.body_kk),
+      body_en: cleanParagraphs(body.body_en),
     }
     data.news.unshift(n)
     save()
@@ -764,6 +786,12 @@ export const news = {
     if (b.body !== undefined) n.body = cleanParagraphs(b.body)
     if (b.cover !== undefined) n.cover = safeMedia(b.cover)
     if (b.published !== undefined) n.published = !!b.published
+    if (b.title_kk !== undefined) n.title_kk = str(b.title_kk, MAX.title)
+    if (b.title_en !== undefined) n.title_en = str(b.title_en, MAX.title)
+    if (b.excerpt_kk !== undefined) n.excerpt_kk = str(b.excerpt_kk, MAX.excerpt)
+    if (b.excerpt_en !== undefined) n.excerpt_en = str(b.excerpt_en, MAX.excerpt)
+    if (b.body_kk !== undefined) n.body_kk = cleanParagraphs(b.body_kk)
+    if (b.body_en !== undefined) n.body_en = cleanParagraphs(b.body_en)
     save()
     return clone(n)
   },

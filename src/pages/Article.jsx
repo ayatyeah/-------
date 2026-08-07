@@ -10,14 +10,16 @@ import { useT } from '../i18n'
 export default function Article() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { t, fdate } = useT()
+  const { t, fdate, tField, tParas } = useT()
   const { data: a, loading, error, reload } = useFetch(() => api.article(id), [id])
+  const aTitle = a ? tField(a, 'title') : ''
+  const aBody = a ? tParas(a, 'body') : []
 
   // Заголовок и описание — из самой статьи; description берём из первого
   // абзаца, обрезав до разумной длины сниппета.
-  const snippet = Array.isArray(a?.body) ? a.body.find((p) => typeof p === 'string') : ''
+  const snippet = aBody.find((p) => typeof p === 'string') || ''
   usePageMeta({
-    title: a ? a.title : 'Новости',
+    title: a ? aTitle : 'Новости',
     description: snippet ? snippet.slice(0, 160) : undefined,
     noindex: !!error,
   })
@@ -54,17 +56,17 @@ export default function Article() {
           {t('back_news')}
         </button>
         <span className="card-meta">{fdate(a.date)}</span>
-        <h1 className="article-title">{a.title}</h1>
+        <h1 className="article-title">{aTitle}</h1>
       </div>
 
       <Reveal variant="clip" style={{ maxWidth: 900, marginInline: 'auto' }}>
         <figure className="article-cover" style={{ marginBlock: 0 }}>
-          <Media src={a.cover} alt={a.title} stub={t('article_cover')} />
+          <Media src={a.cover} alt={aTitle} stub={t('article_cover')} />
         </figure>
       </Reveal>
 
       <div className="article-body" style={{ marginTop: 32 }}>
-        {a.body.map((p, i) => (
+        {aBody.map((p, i) => (
           <Reveal as="p" key={i} delay={i * 70}>
             {p}
           </Reveal>
